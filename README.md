@@ -27,17 +27,6 @@ console.log(standardMarkdown);
 // Output: "Hello **bold** text and _italic_ with [a link](https://example.com)"
 ```
 
-## Features
-
-- Converts Slack-style bold (`*bold*`) to markdown bold (`**bold**`)
-- Converts Slack-style italic (`_italic_`) to markdown italic (`*italic*`)
-- Converts Slack-style strikethrough (`~strike~`) to markdown strikethrough (`~~strike~~`)
-- Converts Slack-style code blocks (both inline and multiline)
-- Converts Slack-style links (`<https://example.com|text>`) to markdown links (`[text](https://example.com)`)
-- Handles bullet points and numbered lists
-- Handles blockquotes
-- Graceful error recovery for malformed input
-
 ## API
 
 ### slackMarkdownToMarkdown(text, logLevel)
