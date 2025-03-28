@@ -5,13 +5,22 @@ export type StateKey =
 	| "STRIKETHROUGH"
 	| "INLINE_CODE"
 	| "CODE_BLOCK"
+	| "LINK"
 	| "SKIP_TOKENS"
 	| "END";
 
-export type BasicStateKey = Exclude<StateKey, "SKIP_TOKENS">;
+export type BasicStateKey = Exclude<StateKey, "SKIP_TOKENS" | "LINK">;
 
 export type BasicStateData = {
 	state: BasicStateKey;
+};
+
+export type LinkStateData = {
+	state: "LINK";
+	url: string;
+	displayText: string | null;
+	parsingPhase: "url" | "displayText" | "closing";
+	nextState: BasicStateKey; // State to return to after link is complete
 };
 
 export type SkipTokensStateData = {
@@ -20,7 +29,7 @@ export type SkipTokensStateData = {
 	nextState: BasicStateKey;
 };
 
-export type StateData = BasicStateData | SkipTokensStateData;
+export type StateData = BasicStateData | LinkStateData | SkipTokensStateData;
 
 export type StateMachineInput = {
 	previousTokens: string[];
@@ -73,6 +82,19 @@ const isCodeBlockStart = (input: StateMachineInput): boolean => {
 	return true;
 };
 
+// Helper function to check for a link start (<https://...)
+const isLinkStart = (input: StateMachineInput): boolean => {
+	// Check if the current token is <
+	if (input.currentToken !== "<") return false;
+	
+	// Check if the next token starts with http:// or https://
+	if (input.nextTokens.length === 0) return false;
+	
+	// Look for http or https at the start
+	const nextChars = input.nextTokens.slice(0, 8).join("");
+	return nextChars.startsWith("http://") || nextChars.startsWith("https://");
+};
+
 const createFormattedTextStateHandler = (
 	stateKey: BasicStateKey,
 	formatToken: string,
@@ -85,6 +107,22 @@ const createFormattedTextStateHandler = (
 				result: sm.result + formatToken.repeat(times),
 				currentState: {
 					state: input.nextTokens.length > 0 ? "TEXT" : "END",
+				},
+			};
+		}
+
+		// Check for link start, even in formatted text
+		if (isLinkStart(input)) {
+			// Enter link mode
+			return {
+				...sm,
+				// Don't add the opening < to the result
+				currentState: {
+					state: "LINK",
+					url: "",
+					displayText: null,
+					parsingPhase: "url",
+					nextState: stateKey,
 				},
 			};
 		}
@@ -167,7 +205,20 @@ const handleSpecialCharacters = (
 
 const states: Record<string, StateHandler> = {
 	TEXT: (sm: StateMachine, input: StateMachineInput): StateMachine => {
-		if (isCodeBlockStart(input)) {
+		if (isLinkStart(input)) {
+			// Enter link mode
+			return {
+				...sm,
+				// Don't add the opening < to the result
+				currentState: {
+					state: "LINK",
+					url: "",
+					displayText: null,
+					parsingPhase: "url",
+					nextState: "TEXT",
+				},
+			};
+		} else if (isCodeBlockStart(input)) {
 			// Enter code block mode (triple backticks)
 			return {
 				...sm,
@@ -239,6 +290,22 @@ const states: Record<string, StateHandler> = {
 			};
 		}
 
+		// Check for link start, even in code blocks
+		if (isLinkStart(input)) {
+			// Enter link mode
+			return {
+				...sm,
+				// Don't add the opening < to the result
+				currentState: {
+					state: "LINK",
+					url: "",
+					displayText: null,
+					parsingPhase: "url",
+					nextState: "CODE_BLOCK",
+				},
+			};
+		}
+
 		// Handle special characters even in code blocks
 		const specialCharsResult = handleSpecialCharacters(sm, input, "CODE_BLOCK");
 		if (specialCharsResult !== null) {
@@ -251,6 +318,63 @@ const states: Record<string, StateHandler> = {
 			result: sm.result + input.currentToken,
 			currentState: { state: "CODE_BLOCK" },
 		};
+	},
+	LINK: (sm: StateMachine, input: StateMachineInput): StateMachine => {
+		const linkData = sm.currentState as LinkStateData;
+		
+		// Handle link closing
+		if (input.currentToken === ">") {
+			const url = linkData.url;
+			const displayText = linkData.displayText || url;
+			
+			// Format as markdown link: [display](url)
+			const markdownLink = `[${displayText}](${url})`;
+			
+			return {
+				...sm,
+				result: sm.result + markdownLink,
+				currentState: {
+					state: input.nextTokens.length > 0 ? linkData.nextState : "END",
+				},
+			};
+		}
+		
+		// Handle separator between URL and display text
+		if (input.currentToken === "|" && linkData.parsingPhase === "url") {
+			return {
+				...sm,
+				currentState: {
+					...linkData,
+					displayText: "",
+					parsingPhase: "displayText",
+				},
+			};
+		}
+		
+		// Accumulate URL characters
+		if (linkData.parsingPhase === "url") {
+			return {
+				...sm,
+				currentState: {
+					...linkData,
+					url: linkData.url + input.currentToken,
+				},
+			};
+		}
+		
+		// Accumulate display text characters
+		if (linkData.parsingPhase === "displayText") {
+			return {
+				...sm,
+				currentState: {
+					...linkData,
+					displayText: (linkData.displayText || "") + input.currentToken,
+				},
+			};
+		}
+		
+		// Fallback - should not reach here
+		return sm;
 	},
 	END: (sm: StateMachine, _input: StateMachineInput): StateMachine => {
 		return sm;

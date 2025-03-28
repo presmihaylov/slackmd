@@ -216,4 +216,47 @@ describe("slackMarkdownToMarkdown", () => {
 		const expected = "```\n// Complex expression with HTML entities and formatting chars\nif (x < 10 && y > 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x < 10 ? '*low*' : '_high_'}`;\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
+
+	// Link tests
+	it("should convert a simple link", () => {
+		const input = "<https://example.com>";
+		const expected = "[https://example.com](https://example.com)";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert a link with display text", () => {
+		const input = "<https://example.com|Example Website>";
+		const expected = "[Example Website](https://example.com)";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert multiple links in text", () => {
+		const input = "Check out <https://example.com> and also <https://another.com|Another Site>";
+		const expected = "Check out [https://example.com](https://example.com) and also [Another Site](https://another.com)";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert links with surrounding text formatting", () => {
+		const input = "*Check out <https://example.com>*";
+		const expected = "**Check out [https://example.com](https://example.com)**";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert links inside code blocks", () => {
+		const input = "```\nVisit <https://example.com> for documentation\n```";
+		const expected = "```\nVisit [https://example.com](https://example.com) for documentation\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle links with complex URLs", () => {
+		const input = "<https://example.com/path?param=value&other=123>";
+		const expected = "[https://example.com/path?param=value&other=123](https://example.com/path?param=value&other=123)";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle links with complex display text", () => {
+		const input = "<https://example.com|Visit *Example* Site>";
+		const expected = "[Visit *Example* Site](https://example.com)";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
 });
