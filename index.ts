@@ -19,7 +19,7 @@ export function slackMarkdownToMarkdown(text: string): string {
 		};
 
 		machine = getState(machine.currentState)(machine, input);
-		if (machine.currentState === "END") {
+		if (machine.currentState.state === "END") {
 			break;
 		}
 	}

@@ -6,6 +6,10 @@ export type StateKey =
 	| "INLINE_CODE"
 	| "END";
 
+export type StateData = {
+	state: StateKey;
+};
+
 export type StateMachineInput = {
 	previousTokens: string[];
 	currentToken: string;
@@ -13,7 +17,7 @@ export type StateMachineInput = {
 };
 
 export type StateMachine = {
-	currentState: StateKey;
+	currentState: StateData;
 	result: string;
 };
 
@@ -57,13 +61,17 @@ const createFormattedTextStateHandler = (
 			return {
 				...sm,
 				result: sm.result + formatToken.repeat(times),
-				currentState: input.nextTokens.length > 0 ? "TEXT" : "END",
+				currentState: {
+					state: input.nextTokens.length > 0 ? "TEXT" : "END"
+				},
 			};
 		} else {
 			return {
 				...sm,
 				result: sm.result + input.currentToken,
-				currentState: stateKey,
+				currentState: {
+					state: stateKey
+				},
 			};
 		}
 	};
@@ -75,33 +83,37 @@ const states: Record<string, StateHandler> = {
 			return {
 				...sm,
 				result: sm.result + "**",
-				currentState: "BOLD",
+				currentState: { state: "BOLD" },
 			};
 		} else if (shouldEnterFormattedText(input, "_")) {
 			return {
 				...sm,
 				result: sm.result + "_",
-				currentState: "ITALIC",
+				currentState: { state: "ITALIC" },
 			};
 		} else if (shouldEnterFormattedText(input, "~")) {
 			return {
 				...sm,
 				result: sm.result + "~~",
-				currentState: "STRIKETHROUGH",
+				currentState: { state: "STRIKETHROUGH" },
 			};
 		} else if (input.currentToken === "\u2022") {
 			// bullet point
 			return {
 				...sm,
 				result: sm.result + "*",
-				currentState: input.nextTokens.length > 0 ? "TEXT" : "END",
+				currentState: {
+					state: input.nextTokens.length > 0 ? "TEXT" : "END"
+				},
 			};
 		}
 
 		return {
 			...sm,
 			result: sm.result + input.currentToken,
-			currentState: input.nextTokens.length > 0 ? "TEXT" : "END",
+			currentState: {
+				state: input.nextTokens.length > 0 ? "TEXT" : "END"
+			},
 		};
 	},
 	BOLD: createFormattedTextStateHandler("BOLD", "*", 2),
@@ -113,10 +125,10 @@ const states: Record<string, StateHandler> = {
 	},
 };
 
-export const getState = (key: StateKey): StateHandler => {
-	const state = states[key];
+export const getState = (stateData: StateData): StateHandler => {
+	const state = states[stateData.state];
 	if (state === undefined) {
-		throw new Error(`State ${key} not found`);
+		throw new Error(`State ${stateData.state} not found`);
 	}
 
 	return state;
@@ -124,7 +136,7 @@ export const getState = (key: StateKey): StateHandler => {
 
 export const createStateMachine = (): StateMachine => {
 	return {
-		currentState: "TEXT",
+		currentState: { state: "TEXT" },
 		result: "",
 	};
 };
