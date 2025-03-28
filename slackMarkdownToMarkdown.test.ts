@@ -88,4 +88,132 @@ describe("slackMarkdownToMarkdown", () => {
 		const expected = "* Item 1\n* Item 2\n* Item 3";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
+
+	it("should convert HTML entity &gt; to > symbol", () => {
+		const input = "This is &gt; than that";
+		const expected = "This is > than that";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert HTML entity &gt; within formatted text", () => {
+		const input = "*This is &gt; than that*";
+		const expected = "**This is > than that**";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert HTML entity &lt; to < symbol", () => {
+		const input = "This is &lt; than that";
+		const expected = "This is < than that";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert HTML entity &amp; to & symbol", () => {
+		const input = "This is an &amp; ampersand";
+		const expected = "This is an & ampersand";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert HTML entity &lt; within formatted text", () => {
+		const input = "*This is &lt; than that*";
+		const expected = "**This is < than that**";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	// HTML entity conversion in different formatting states
+	it("should convert HTML entities in italic text", () => {
+		const input = "_This is &lt; than that and &gt; than this_";
+		const expected = "_This is < than that and > than this_";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert HTML entities in strikethrough text", () => {
+		const input = "~This is &lt; than that and &gt; than this~";
+		const expected = "~~This is < than that and > than this~~";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle HTML entities at the start of formatted text", () => {
+		const input = "*&lt;start&gt; of the text*";
+		const expected = "**<start> of the text**";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle HTML entities at the end of formatted text", () => {
+		const input = "*end of the text &lt;here&gt;*";
+		const expected = "**end of the text <here>**";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle multiple HTML entities in a single formatted text", () => {
+		const input = "*&lt;tag&gt;content&lt;/tag&gt;*";
+		const expected = "**<tag>content</tag>**";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert HTML entities in inline code", () => {
+		const input = "`const x = array[0] &lt; 10 &amp;&amp; array[0] &gt; 0;`";
+		const expected = "`const x = array[0] < 10 && array[0] > 0;`";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should convert multiple consecutive &amp; entities", () => {
+		const input = "Logical AND: &amp;&amp;";
+		const expected = "Logical AND: &&";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	// Code block tests
+	it("should preserve code blocks", () => {
+		const input = "```const x = 10;```";
+		const expected = "```const x = 10;```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle backticks inside code blocks", () => {
+		const input = "```inline code with `backticks` inside```";
+		const expected = "```inline code with `backticks` inside```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle HTML entities inside code blocks", () => {
+		const input = "```if (x &lt; 10 &amp;&amp; y &gt; 20) { /* do something */ }```";
+		const expected = "```if (x < 10 && y > 20) { /* do something */ }```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle multiline code blocks", () => {
+		const input = "```\nfunction test() {\n  return true;\n}\n```";
+		const expected = "```\nfunction test() {\n  return true;\n}\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should not convert bold formatting inside a code block", () => {
+		const input = "```\nThis is some code with *asterisks* that should not be converted to bold\nconst message = 'Using *asterisks* for emphasis in comments';\n```";
+		const expected = "```\nThis is some code with *asterisks* that should not be converted to bold\nconst message = 'Using *asterisks* for emphasis in comments';\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should not convert italic formatting inside a code block", () => {
+		const input = "```\nconsole.log('Hello');\n// _This is a comment with underscores_\nlet var_name_with_underscores = 'value';\n```";
+		const expected = "```\nconsole.log('Hello');\n// _This is a comment with underscores_\nlet var_name_with_underscores = 'value';\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should not convert strikethrough formatting inside a code block", () => {
+		const input = "```\n// Documentation for deprecated functions that will be ~removed~ soon\nfunction legacyFunction() ~deprecated~ {\n  // Implementation\n}\n```";
+		const expected = "```\n// Documentation for deprecated functions that will be ~removed~ soon\nfunction legacyFunction() ~deprecated~ {\n  // Implementation\n}\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle a large code block with mixed formatting patterns", () => {
+		const input = "```\n/*\n * This large comment block has examples of:\n * *bold text* that should stay as single asterisks\n * _italic text_ that should stay as single underscores\n * ~strikethrough~ that should stay as single tildes\n */\n\nconst config = {\n  formatting: {\n    bold: '*use asterisks*',\n    italic: '_use underscores_',\n    strike: '~use tildes~',\n    code: '`use backticks`'\n  },\n  examples: [\n    '*not bold*',\n    '_not italic_',\n    '~not strikethrough~'\n  ]\n};\n```";
+		const expected = "```\n/*\n * This large comment block has examples of:\n * *bold text* that should stay as single asterisks\n * _italic text_ that should stay as single underscores\n * ~strikethrough~ that should stay as single tildes\n */\n\nconst config = {\n  formatting: {\n    bold: '*use asterisks*',\n    italic: '_use underscores_',\n    strike: '~use tildes~',\n    code: '`use backticks`'\n  },\n  examples: [\n    '*not bold*',\n    '_not italic_',\n    '~not strikethrough~'\n  ]\n};\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle a code block with HTML entities and formatting characters", () => {
+		const input = "```\n// Complex expression with HTML entities and formatting chars\nif (x &lt; 10 &amp;&amp; y &gt; 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x &lt; 10 ? '*low*' : '_high_'}`;\n```";
+		const expected = "```\n// Complex expression with HTML entities and formatting chars\nif (x < 10 && y > 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x < 10 ? '*low*' : '_high_'}`;\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
 });

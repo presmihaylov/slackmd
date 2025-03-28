@@ -3,7 +3,8 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "bun tsc --noEmit"
   },
   "devDependencies": {
     "@types/bun": "latest",
