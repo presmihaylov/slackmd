@@ -37,9 +37,12 @@ export type StateMachineInput = {
 	nextTokens: string[];
 };
 
+import { Logger } from "./logger";
+
 export type StateMachine = {
 	currentState: StateData;
 	result: string;
+	log: Logger; // Logger for state machine
 };
 
 export type StateHandler = (
@@ -86,10 +89,10 @@ const isCodeBlockStart = (input: StateMachineInput): boolean => {
 const isLinkStart = (input: StateMachineInput): boolean => {
 	// Check if the current token is <
 	if (input.currentToken !== "<") return false;
-	
+
 	// Check if the next token starts with http:// or https://
 	if (input.nextTokens.length === 0) return false;
-	
+
 	// Look for http or https at the start
 	const nextChars = input.nextTokens.slice(0, 8).join("");
 	return nextChars.startsWith("http://") || nextChars.startsWith("https://");
@@ -102,6 +105,7 @@ const createFormattedTextStateHandler = (
 ): StateHandler => {
 	return (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		if (input.currentToken === formatToken) {
+			sm.log.debug(`Exiting ${stateKey.toLowerCase()} formatting at position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				result: sm.result + formatToken.repeat(times),
@@ -114,6 +118,7 @@ const createFormattedTextStateHandler = (
 		// Check for link start, even in formatted text
 		if (isLinkStart(input)) {
 			// Enter link mode
+			sm.log.debug(`Detected link inside ${stateKey.toLowerCase()} text at position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				// Don't add the opening < to the result
@@ -166,6 +171,7 @@ const handleSpecialCharacters = (
 ): StateMachine | null => {
 	if (isHtmlEntity(input, "&gt;")) {
 		// Convert &gt; to >
+		sm.log.debug(`Converting HTML entity &gt; to > at position ${input.previousTokens.length}`);
 		return {
 			...sm,
 			result: sm.result + ">",
@@ -177,6 +183,7 @@ const handleSpecialCharacters = (
 		};
 	} else if (isHtmlEntity(input, "&lt;")) {
 		// Convert &lt; to <
+		sm.log.debug(`Converting HTML entity &lt; to < at position ${input.previousTokens.length}`);
 		return {
 			...sm,
 			result: sm.result + "<",
@@ -188,6 +195,7 @@ const handleSpecialCharacters = (
 		};
 	} else if (isHtmlEntity(input, "&amp;")) {
 		// Convert &amp; to &
+		sm.log.debug(`Converting HTML entity &amp; to & at position ${input.previousTokens.length}`);
 		return {
 			...sm,
 			result: sm.result + "&",
@@ -207,6 +215,7 @@ const states: Record<string, StateHandler> = {
 	TEXT: (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		if (isLinkStart(input)) {
 			// Enter link mode
+			sm.log.debug(`Detected link start at token position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				// Don't add the opening < to the result
@@ -220,6 +229,7 @@ const states: Record<string, StateHandler> = {
 			};
 		} else if (isCodeBlockStart(input)) {
 			// Enter code block mode (triple backticks)
+			sm.log.debug(`Detected code block start at token position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				result: sm.result + "```",
@@ -230,18 +240,21 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		} else if (shouldEnterFormattedText(input, "*")) {
+			sm.log.debug(`Entering bold text at token position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				result: sm.result + "**",
 				currentState: { state: "BOLD" },
 			};
 		} else if (shouldEnterFormattedText(input, "_")) {
+			sm.log.debug(`Entering italic text at token position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				result: sm.result + "_",
 				currentState: { state: "ITALIC" },
 			};
 		} else if (shouldEnterFormattedText(input, "~")) {
+			sm.log.debug(`Entering strikethrough text at token position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				result: sm.result + "~~",
@@ -249,6 +262,7 @@ const states: Record<string, StateHandler> = {
 			};
 		} else if (input.currentToken === "\u2022") {
 			// bullet point
+			sm.log.debug(`Converting bullet point at token position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				result: sm.result + "*",
@@ -279,6 +293,7 @@ const states: Record<string, StateHandler> = {
 		// Check for code block end (triple backticks)
 		if (isCodeBlockStart(input)) {
 			// Skip the next two backticks
+			sm.log.debug(`Detected code block end at token position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				result: sm.result + "```",
@@ -293,6 +308,7 @@ const states: Record<string, StateHandler> = {
 		// Check for link start, even in code blocks
 		if (isLinkStart(input)) {
 			// Enter link mode
+			sm.log.debug(`Detected link inside code block at token position ${input.previousTokens.length}`);
 			return {
 				...sm,
 				// Don't add the opening < to the result
@@ -320,16 +336,22 @@ const states: Record<string, StateHandler> = {
 		};
 	},
 	LINK: (sm: StateMachine, input: StateMachineInput): StateMachine => {
+		if (sm.currentState.state !== "LINK") {
+			sm.log.error(`Expected LINK state but got ${sm.currentState.state}`);
+			throw new Error("Invalid state");
+		}
+
 		const linkData = sm.currentState as LinkStateData;
-		
+
 		// Handle link closing
 		if (input.currentToken === ">") {
 			const url = linkData.url;
 			const displayText = linkData.displayText || url;
-			
+
 			// Format as markdown link: [display](url)
 			const markdownLink = `[${displayText}](${url})`;
-			
+			sm.log.debug(`Completed link at token position ${input.previousTokens.length}: ${markdownLink}`);
+
 			return {
 				...sm,
 				result: sm.result + markdownLink,
@@ -338,9 +360,10 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		}
-		
+
 		// Handle separator between URL and display text
 		if (input.currentToken === "|" && linkData.parsingPhase === "url") {
+			sm.log.debug(`Link separator found at token position ${input.previousTokens.length}, switching to display text`);
 			return {
 				...sm,
 				currentState: {
@@ -350,7 +373,7 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		}
-		
+
 		// Accumulate URL characters
 		if (linkData.parsingPhase === "url") {
 			return {
@@ -361,7 +384,7 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		}
-		
+
 		// Accumulate display text characters
 		if (linkData.parsingPhase === "displayText") {
 			return {
@@ -372,19 +395,26 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		}
-		
+
 		// Fallback - should not reach here
+		sm.log.warn(`Unexpected state in LINK handler at token position ${input.previousTokens.length}`);
 		return sm;
 	},
 	END: (sm: StateMachine, _input: StateMachineInput): StateMachine => {
 		return sm;
 	},
 	SKIP_TOKENS: (sm: StateMachine, _input: StateMachineInput): StateMachine => {
+		if (sm.currentState.state !== "SKIP_TOKENS") {
+			sm.log.error(`Expected SKIP_TOKENS state but got ${sm.currentState.state}`);
+			throw new Error("Invalid state");
+		}
+
 		const skipData = sm.currentState as SkipTokensStateData;
 		const tokensToSkip = skipData.tokensToSkip;
 
 		if (tokensToSkip <= 1) {
 			// We've skipped all tokens, return to the previous state
+			sm.log.debug(`Finished skipping tokens, returning to ${skipData.nextState} state`);
 			return {
 				...sm,
 				currentState: {
@@ -394,6 +424,7 @@ const states: Record<string, StateHandler> = {
 		}
 
 		// Continue skipping tokens
+		sm.log.trace(`Skipping token, ${tokensToSkip - 1} more to skip`);
 		return {
 			...sm,
 			currentState: {
@@ -405,18 +436,20 @@ const states: Record<string, StateHandler> = {
 	},
 };
 
-export const getState = (stateData: StateData): StateHandler => {
-	const state = states[stateData.state];
+export const getState = (machine: StateMachine): StateHandler => {
+	const state = states[machine.currentState.state];
 	if (state === undefined) {
-		throw new Error(`State ${stateData.state} not found`);
+		machine.log.error(`State ${machine.currentState.state} not found`);
+		throw new Error(`State ${machine.currentState.state} not found`);
 	}
 
 	return state;
 };
 
-export const createStateMachine = (): StateMachine => {
+export const createStateMachine = (log: Logger): StateMachine => {
 	return {
 		currentState: { state: "TEXT" },
 		result: "",
+		log,
 	};
 };
