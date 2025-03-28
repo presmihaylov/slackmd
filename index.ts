@@ -1,6 +1,6 @@
-import type { StateMachineInput } from "./stateMachine";
-import { createStateMachine, getState } from "./stateMachine";
-import { Logger, LogLevel } from "./logger";
+import type { StateMachineInput } from "./src/stateMachine";
+import { createStateMachine, getState } from "./src/stateMachine";
+import { Logger, LogLevel } from "./src/logger";
 
 /**
  * Converts Slack markdown to standard markdown format
