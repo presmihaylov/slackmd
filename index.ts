@@ -2,18 +2,25 @@ import type { StateMachineInput } from "./src/stateMachine";
 import { createStateMachine, getState } from "./src/stateMachine";
 import { Logger, LogLevel } from "./src/logger";
 
+export { LogLevel };
+
 /**
  * Converts Slack markdown to standard markdown format
  * @param text The Slack markdown text to convert
  * @param logLevel The level of logging (defaults to ERROR only)
  * @returns Standard markdown formatted text
  */
-export function slackMarkdownToMarkdown(text: string, logLevel: LogLevel = LogLevel.ERROR): string {
+export function slackMarkdownToMarkdown(
+	text: string,
+	logLevel: LogLevel = LogLevel.OFF,
+): string {
 	const log = new Logger(logLevel);
 	const tokens = text.split("");
 
 	let machine = createStateMachine(log);
-	log.info(`Starting conversion with initial state: ${machine.currentState.state}`);
+	log.info(
+		`Starting conversion with initial state: ${machine.currentState.state}`,
+	);
 
 	for (let i = 0; i < tokens.length; i++) {
 		const currentToken = tokens[i] ?? "";
@@ -22,8 +29,10 @@ export function slackMarkdownToMarkdown(text: string, logLevel: LogLevel = LogLe
 			currentToken,
 			nextTokens: tokens.slice(i + 1),
 		};
-		
-		log.trace(`Processing token [${i}]: "${currentToken}" in state: ${machine.currentState.state}`);
+
+		log.trace(
+			`Processing token [${i}]: "${currentToken}" in state: ${machine.currentState.state}`,
+		);
 		if (input.nextTokens.length > 0) {
 			log.trace(`Next token: "${input.nextTokens[0]}"`);
 		}
@@ -32,14 +41,16 @@ export function slackMarkdownToMarkdown(text: string, logLevel: LogLevel = LogLe
 			const stateHandler = getState(machine);
 			const prevState = machine.currentState.state;
 			machine = stateHandler(machine, input);
-			
+
 			if (prevState !== machine.currentState.state) {
-				log.debug(`State transition: ${prevState} -> ${machine.currentState.state}`);
+				log.debug(
+					`State transition: ${prevState} -> ${machine.currentState.state}`,
+				);
 			}
 		} catch (error) {
 			log.error(`Error processing token "${currentToken}":`, error);
 			log.warn(`Recovering by keeping token as plain text`);
-			
+
 			// If there's an error, stay in the same state and continue parsing
 			// Just add the current token to the result
 			machine = {
@@ -47,7 +58,7 @@ export function slackMarkdownToMarkdown(text: string, logLevel: LogLevel = LogLe
 				result: machine.result + currentToken,
 			};
 		}
-		
+
 		if (machine.currentState.state === "END") {
 			log.debug(`Reached END state, breaking`);
 			break;

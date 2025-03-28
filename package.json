@@ -1,16 +1,82 @@
 {
-  "name": "slackmd",
+  "name": "@presmihaylov/slackmd",
+  "version": "1.0.0",
+  "description": "Convert Slack markdown to standard markdown",
   "module": "index.ts",
+  "main": "index.js",
   "type": "module",
   "scripts": {
     "test": "vitest run",
-    "typecheck": "bun tsc --noEmit"
+    "typecheck": "bun tsc --noEmit",
+    "prepublish": "bun tsc"
   },
+  "keywords": [
+    "slack",
+    "markdown",
+    "converter"
+  ],
+  "author": "pmihaylov",
+  "license": "MIT",
   "devDependencies": {
     "@types/bun": "latest",
     "vitest": "^3.0.9"
   },
   "peerDependencies": {
     "typescript": "^5"
-  }
+  },
+  "files": [
+    "*.js",
+    "*.d.ts"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "directories": {
+    "example": "examples"
+  },
+  "dependencies": {
+    "assertion-error": "^2.0.1",
+    "bun-types": "^1.2.7",
+    "cac": "^6.7.14",
+    "chai": "^5.2.0",
+    "check-error": "^2.1.1",
+    "debug": "^4.4.0",
+    "deep-eql": "^5.0.2",
+    "es-module-lexer": "^1.6.0",
+    "esbuild": "^0.25.1",
+    "estree-walker": "^3.0.3",
+    "expect-type": "^1.2.0",
+    "fsevents": "^2.3.3",
+    "loupe": "^3.1.3",
+    "magic-string": "^0.30.17",
+    "ms": "^2.1.3",
+    "nanoid": "^3.3.11",
+    "pathe": "^2.0.3",
+    "pathval": "^2.0.0",
+    "picocolors": "^1.1.1",
+    "postcss": "^8.5.3",
+    "rollup": "^4.37.0",
+    "siginfo": "^2.0.0",
+    "source-map-js": "^1.2.1",
+    "stackback": "^0.0.2",
+    "std-env": "^3.8.1",
+    "tinybench": "^2.9.0",
+    "tinyexec": "^0.3.2",
+    "tinypool": "^1.0.2",
+    "tinyrainbow": "^2.0.0",
+    "tinyspy": "^3.0.2",
+    "typescript": "^5.8.2",
+    "undici-types": "^6.20.0",
+    "vite": "^6.2.3",
+    "vite-node": "^3.0.9",
+    "why-is-node-running": "^2.3.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/presmihaylov/slackmd.git"
+  },
+  "bugs": {
+    "url": "https://github.com/presmihaylov/slackmd/issues"
+  },
+  "homepage": "https://github.com/presmihaylov/slackmd#readme"
 }
