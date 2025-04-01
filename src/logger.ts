@@ -5,7 +5,6 @@ export enum LogLevel {
 	INFO = 3,
 	DEBUG = 4,
 	TRACE = 5,
-	OFF = 999 // Maximum level, not meant to be used directly
 }
 
 /**

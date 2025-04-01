@@ -12,7 +12,7 @@ export { LogLevel };
  */
 export function slackMarkdownToMarkdown(
 	text: string,
-	logLevel: LogLevel = LogLevel.OFF,
+	logLevel: LogLevel = LogLevel.NONE,
 ): string {
 	const log = new Logger(logLevel);
 	const tokens = text.split("");

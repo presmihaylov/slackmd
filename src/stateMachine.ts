@@ -230,9 +230,14 @@ const states: Record<string, StateHandler> = {
 		} else if (isCodeBlockStart(input)) {
 			// Enter code block mode (triple backticks)
 			sm.log.debug(`Detected code block start at token position ${input.previousTokens.length}`);
+			
+			// Check if the next token after the triple backticks is a newline
+			const hasNewlineAfterOpening = input.nextTokens.length > 2 && input.nextTokens[2] === "\n";
+			
 			return {
 				...sm,
-				result: sm.result + "```",
+				// Add a newline after the opening ``` if one is not already present
+				result: sm.result + "```" + (hasNewlineAfterOpening ? "" : "\n"),
 				currentState: {
 					state: "SKIP_TOKENS",
 					tokensToSkip: 2, // Skip the next two backticks
@@ -294,9 +299,15 @@ const states: Record<string, StateHandler> = {
 		if (isCodeBlockStart(input)) {
 			// Skip the next two backticks
 			sm.log.debug(`Detected code block end at token position ${input.previousTokens.length}`);
+			
+			// Check if the last character before closing ``` is a newline
+			const hasNewlineBeforeClosing = input.previousTokens.length > 0 && 
+				input.previousTokens[input.previousTokens.length - 1] === "\n";
+			
 			return {
 				...sm,
-				result: sm.result + "```",
+				// Add a newline before the closing ``` if one is not already present
+				result: sm.result + (hasNewlineBeforeClosing ? "" : "\n") + "```",
 				currentState: {
 					state: "SKIP_TOKENS",
 					tokensToSkip: 2, // Skip the next two backticks

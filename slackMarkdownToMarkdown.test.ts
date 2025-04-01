@@ -163,21 +163,21 @@ describe("slackMarkdownToMarkdown", () => {
 	});
 
 	// Code block tests
-	it("should preserve code blocks", () => {
+	it("should add newlines around code blocks", () => {
 		const input = "```const x = 10;```";
-		const expected = "```const x = 10;```";
+		const expected = "```\nconst x = 10;\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
 	it("should handle backticks inside code blocks", () => {
 		const input = "```inline code with `backticks` inside```";
-		const expected = "```inline code with `backticks` inside```";
+		const expected = "```\ninline code with `backticks` inside\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
 	it("should handle HTML entities inside code blocks", () => {
 		const input = "```if (x &lt; 10 &amp;&amp; y &gt; 20) { /* do something */ }```";
-		const expected = "```if (x < 10 && y > 20) { /* do something */ }```";
+		const expected = "```\nif (x < 10 && y > 20) { /* do something */ }\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
@@ -214,6 +214,31 @@ describe("slackMarkdownToMarkdown", () => {
 	it("should handle a code block with HTML entities and formatting characters", () => {
 		const input = "```\n// Complex expression with HTML entities and formatting chars\nif (x &lt; 10 &amp;&amp; y &gt; 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x &lt; 10 ? '*low*' : '_high_'}`;\n```";
 		const expected = "```\n// Complex expression with HTML entities and formatting chars\nif (x < 10 && y > 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x < 10 ? '*low*' : '_high_'}`;\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+	
+	// Test cases for adding newlines around code blocks when they're missing
+	it("should add a newline after opening code block if missing", () => {
+		const input = "```const x = 10;```";
+		const expected = "```\nconst x = 10;\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+	
+	it("should add a newline before closing code block if missing", () => {
+		const input = "```\nconst x = 10;```";
+		const expected = "```\nconst x = 10;\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+	
+	it("should add newlines on both sides of code block if missing", () => {
+		const input = "```const x = 10;```";
+		const expected = "```\nconst x = 10;\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+	
+	it("should not add extra newlines if they are already present", () => {
+		const input = "```\nconst x = 10;\n```";
+		const expected = "```\nconst x = 10;\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
