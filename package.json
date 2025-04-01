@@ -1,14 +1,16 @@
 {
     "name": "@presmihaylov/slackmd",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Convert Slack markdown to standard markdown",
-    "module": "index.ts",
-    "main": "index.js",
+    "module": "dist/index.js",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
     "type": "module",
     "scripts": {
         "test": "vitest run",
         "typecheck": "bun tsc --noEmit",
-        "prepublish": "bun tsc"
+        "build": "bun tsc",
+        "prepublishOnly": "bun run build"
     },
     "keywords": [
         "slack",
@@ -25,8 +27,7 @@
         "typescript": "^5"
     },
     "files": [
-        "*.js",
-        "*.d.ts"
+        "dist"
     ],
     "publishConfig": {
         "access": "public"
