@@ -140,7 +140,12 @@ const createFormattedTextStateHandler = (
 			};
 		}
 
-		const specialCharsResult = handleSpecialCharacters(sm, input, stateKey);
+		const specialCharsResult = handleSpecialCharacters(
+			sm,
+			input,
+			stateKey,
+			stateKey,
+		);
 		if (specialCharsResult !== null) {
 			return specialCharsResult;
 		}
@@ -177,6 +182,7 @@ const handleSpecialCharacters = (
 	sm: StateMachine,
 	input: StateMachineInput,
 	nextState: BasicStateKey,
+	prevState: BasicStateKey,
 ): StateMachine | null => {
 	if (isHtmlEntity(input, "&gt;")) {
 		// Convert &gt; to >
@@ -190,7 +196,7 @@ const handleSpecialCharacters = (
 				state: "SKIP_TOKENS",
 				tokensToSkip: 3, // Skip 'g', 't', ';'
 				nextState,
-				prevState: "TEXT",
+				prevState,
 			},
 		};
 	} else if (isHtmlEntity(input, "&lt;")) {
@@ -205,7 +211,7 @@ const handleSpecialCharacters = (
 				state: "SKIP_TOKENS",
 				tokensToSkip: 3, // Skip 'l', 't', ';'
 				nextState,
-				prevState: "TEXT",
+				prevState,
 			},
 		};
 	} else if (isHtmlEntity(input, "&amp;")) {
@@ -220,7 +226,7 @@ const handleSpecialCharacters = (
 				state: "SKIP_TOKENS",
 				tokensToSkip: 4, // Skip 'a', 'm', 'p', ';'
 				nextState,
-				prevState: "TEXT",
+				prevState,
 			},
 		};
 	}
@@ -311,7 +317,12 @@ const states: Record<string, StateHandler> = {
 			};
 		}
 
-		const specialCharsResult = handleSpecialCharacters(sm, input, "TEXT");
+		const specialCharsResult = handleSpecialCharacters(
+			sm,
+			input,
+			"TEXT",
+			"TEXT",
+		);
 		if (specialCharsResult !== null) {
 			return specialCharsResult;
 		}
@@ -376,7 +387,12 @@ const states: Record<string, StateHandler> = {
 		}
 
 		// Handle special characters even in code blocks
-		const specialCharsResult = handleSpecialCharacters(sm, input, "CODE_BLOCK");
+		const specialCharsResult = handleSpecialCharacters(
+			sm,
+			input,
+			"CODE_BLOCK",
+			"CODE_BLOCK",
+		);
 		if (specialCharsResult !== null) {
 			return specialCharsResult;
 		}
