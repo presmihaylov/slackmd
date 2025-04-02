@@ -6,6 +6,7 @@ export type StateKey =
 	| "INLINE_CODE"
 	| "CODE_BLOCK"
 	| "BLOCKQUOTE"
+	| "BULLET_LIST"
 	| "LINK"
 	| "SKIP_TOKENS"
 	| "END";
@@ -124,6 +125,48 @@ const isInlineCode = (input: StateMachineInput): boolean => {
 	
 	// Check if there's another backtick in next tokens
 	return input.nextTokens.some(token => token === "`");
+};
+
+// Helper function to check for bullet list markers
+const isBulletListMarker = (input: StateMachineInput): boolean => {
+	// Check if we're at the beginning of a line
+	if (!isBeginningOfLine(input)) return false;
+	
+	// Check for bullet character
+	if (input.currentToken === "\u2022") return true;
+	
+	// Check for asterisk bullet (* )
+	if (input.currentToken === "*" && 
+	    input.nextTokens.length > 0 && 
+	    input.nextTokens[0] === " ") {
+		return true;
+	}
+	
+	return false;
+};
+
+// Helper function to check for ordered list markers (1., 2., etc.)
+const isOrderedListMarker = (input: StateMachineInput): boolean => {
+	// Check if we're at the beginning of a line
+	if (!isBeginningOfLine(input)) return false;
+	
+	// Check if current token is a digit
+	if (!/\d/.test(input.currentToken)) return false;
+	
+	// Look ahead for a period followed by a space
+	// Need at least 2 characters ahead (period and space)
+	if (input.nextTokens.length < 2) return false;
+	
+	// Continue reading digits until we hit non-digit
+	let i = 0;
+	while (i < input.nextTokens.length && /\d/.test(input.nextTokens[i] || "")) {
+		i++;
+	}
+	
+	// Check if the next character after digits is a period followed by space
+	return i < input.nextTokens.length - 1 && 
+	       (input.nextTokens[i] || "") === "." && 
+	       (input.nextTokens[i + 1] || "") === " ";
 };
 
 const createFormattedTextStateHandler = (
@@ -262,6 +305,144 @@ const handleSpecialCharacters = (
 };
 
 const states: Record<string, StateHandler> = {
+	BULLET_LIST: (sm: StateMachine, input: StateMachineInput): StateMachine => {
+		// Check for bullet character within list items
+		if (input.currentToken === "\u2022") {
+			sm.log.debug(
+				`Converting bullet point inside list at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "*",
+				currentState: {
+					state: "BULLET_LIST",
+					prevState: sm.currentState.prevState,
+				},
+			};
+		}
+		
+		// Check if we've reached a newline (end of the current list item)
+		if (input.currentToken === "\n") {
+			// Look ahead to check if the next line is another list item
+			const isFollowedByListItem = 
+				input.nextTokens.length > 0 && 
+				(isBulletListMarker({ 
+					previousTokens: [...input.previousTokens, input.currentToken], 
+					currentToken: input.nextTokens[0] || "", 
+					nextTokens: input.nextTokens.slice(1) 
+				}) || isOrderedListMarker({ 
+					previousTokens: [...input.previousTokens, input.currentToken], 
+					currentToken: input.nextTokens[0] || "", 
+					nextTokens: input.nextTokens.slice(1) 
+				}));
+			
+			// If the next line isn't a list item, exit the list state and add an extra newline
+			if (!isFollowedByListItem) {
+				sm.log.debug(
+					`Exiting bullet list at token position ${input.previousTokens.length}`,
+				);
+				
+				// Check if we need to add an extra newline for proper markdown spacing
+				const hasDoubleNewline = 
+					input.nextTokens.length > 0 && 
+					input.nextTokens[0] === "\n";
+					
+				return {
+					...sm,
+					result: sm.result + "\n" + (hasDoubleNewline || input.nextTokens.length === 0 ? "" : "\n"),
+					currentState: {
+						state: "TEXT",
+						prevState: "BULLET_LIST",
+					},
+				};
+			}
+			
+			// If the next line is another list item, just add the newline and continue
+			return {
+				...sm,
+				result: sm.result + input.currentToken,
+				currentState: {
+					state: "BULLET_LIST",
+					prevState: sm.currentState.prevState,
+				},
+			};
+		}
+		
+		// Handle formatted text inside bullet list
+		if (isLinkStart(input)) {
+			sm.log.debug(
+				`Detected link inside bullet list at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				currentState: {
+					state: "LINK",
+					url: "",
+					displayText: null,
+					parsingPhase: "url",
+					prevState: "BULLET_LIST",
+				},
+			};
+		} else if (shouldEnterFormattedText(input, "*")) {
+			sm.log.debug(
+				`Entering bold text inside bullet list at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "**",
+				currentState: { state: "BOLD", prevState: "BULLET_LIST" },
+			};
+		} else if (shouldEnterFormattedText(input, "_")) {
+			sm.log.debug(
+				`Entering italic text inside bullet list at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "_",
+				currentState: { state: "ITALIC", prevState: "BULLET_LIST" },
+			};
+		} else if (shouldEnterFormattedText(input, "~")) {
+			sm.log.debug(
+				`Entering strikethrough text inside bullet list at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "~~",
+				currentState: { state: "STRIKETHROUGH", prevState: "BULLET_LIST" },
+			};
+		} else if (isInlineCode(input)) {
+			sm.log.debug(
+				`Entering inline code inside bullet list at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "`",
+				currentState: { state: "INLINE_CODE", prevState: "BULLET_LIST" },
+			};
+		}
+		
+		// Handle special characters
+		const specialCharsResult = handleSpecialCharacters(
+			sm,
+			input,
+			"BULLET_LIST",
+			"BULLET_LIST",
+		);
+		if (specialCharsResult !== null) {
+			return specialCharsResult;
+		}
+		
+		// Normal case - just add the character and continue in BULLET_LIST state
+		return {
+			...sm,
+			result: sm.result + input.currentToken,
+			currentState: {
+				state: "BULLET_LIST", 
+				prevState: sm.currentState.prevState,
+			},
+		};
+	},
+	
 	TEXT: (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		// Check for blockquote start if we're at the beginning of a line and the current token is ">"
 		if (isBeginningOfLine(input) && input.currentToken === ">") {
@@ -272,6 +453,39 @@ const states: Record<string, StateHandler> = {
 				...sm,
 				result: sm.result + ">",
 				currentState: { state: "BLOCKQUOTE", prevState: "TEXT" },
+			};
+		} else if (isBulletListMarker(input)) {
+			// Enter bullet list mode
+			sm.log.debug(
+				`Detected bullet list at token position ${input.previousTokens.length}`,
+			);
+			
+			// Handle the bullet character appropriately
+			if (input.currentToken === "\u2022") {
+				return {
+					...sm,
+					result: sm.result + "*",
+					currentState: { state: "BULLET_LIST", prevState: "TEXT" },
+				};
+			} else if (input.currentToken === "*") {
+				// Add the asterisk and stay in current state to process the space next
+				return {
+					...sm,
+					result: sm.result + "*",
+					currentState: { state: "BULLET_LIST", prevState: "TEXT" },
+				};
+			}
+		} else if (isOrderedListMarker(input)) {
+			// Enter ordered list mode
+			sm.log.debug(
+				`Detected ordered list at token position ${input.previousTokens.length}`,
+			);
+			
+			// Add the current digit
+			return {
+				...sm,
+				result: sm.result + input.currentToken,
+				currentState: { state: "BULLET_LIST", prevState: "TEXT" },
 			};
 		} else if (isLinkStart(input)) {
 			// Enter link mode
@@ -347,9 +561,9 @@ const states: Record<string, StateHandler> = {
 				currentState: { state: "INLINE_CODE", prevState: "TEXT" },
 			};
 		} else if (input.currentToken === "\u2022") {
-			// bullet point
+			// bullet point that's not at the beginning of a line (inline bullet)
 			sm.log.debug(
-				`Converting bullet point at token position ${input.previousTokens.length}`,
+				`Converting inline bullet point at token position ${input.previousTokens.length}`,
 			);
 			return {
 				...sm,

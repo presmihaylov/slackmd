@@ -83,10 +83,162 @@ describe("slackMarkdownToMarkdown", () => {
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
-	it("should transform bullet character to markdown bullet point", () => {
-		const input = "\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3";
-		const expected = "* Item 1\n* Item 2\n* Item 3";
-		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	describe("Bullet Lists", () => {
+		// Basic Conversion
+		it("should transform bullet character to markdown bullet point", () => {
+			const input = "\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3";
+			const expected = "* Item 1\n* Item 2\n* Item 3";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should maintain asterisk-based bullet list markers", () => {
+			const input = "* Item 1\n* Item 2\n* Item 3";
+			const expected = "* Item 1\n* Item 2\n* Item 3";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		// Newline Behavior
+		it("should add extra newlines when bullet list is followed by content", () => {
+			const input = "\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3\nNormal text after";
+			const expected = "* Item 1\n* Item 2\n* Item 3\n\nNormal text after";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should not add extra newlines when bullet list is the last thing in input", () => {
+			const input = "\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3";
+			const expected = "* Item 1\n* Item 2\n* Item 3";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should not add extra newlines if already present", () => {
+			const input = "\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3\n\nNormal text";
+			const expected = "* Item 1\n* Item 2\n* Item 3\n\nNormal text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		// Formatting
+		it("should handle bold text inside bullet list items", () => {
+			const input = "\u2022 Item with *bold* text";
+			const expected = "* Item with **bold** text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle italic text inside bullet list items", () => {
+			const input = "\u2022 Item with _italic_ text";
+			const expected = "* Item with _italic_ text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle strikethrough text inside bullet list items", () => {
+			const input = "\u2022 Item with ~strikethrough~ text";
+			const expected = "* Item with ~~strikethrough~~ text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle inline code inside bullet list items", () => {
+			const input = "\u2022 Item with `code` text";
+			const expected = "* Item with `code` text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		// Special Elements
+		it("should handle links inside bullet list items", () => {
+			const input = "\u2022 Item with <https://example.com|link>";
+			const expected = "* Item with [link](https://example.com)";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle HTML entities inside bullet list items", () => {
+			const input = "\u2022 Item with &lt; symbol and &gt; symbol";
+			const expected = "* Item with < symbol and > symbol";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		// Edge Cases
+		it("should handle mixed bullet markers in the same list", () => {
+			const input = "\u2022 Item 1\n* Item 2\n\u2022 Item 3";
+			const expected = "* Item 1\n* Item 2\n* Item 3";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+	});
+	
+	describe("Ordered Lists", () => {
+		// Basic Conversion
+		it("should maintain ordered list markers", () => {
+			const input = "1. Item 1\n2. Item 2\n3. Item 3";
+			const expected = "1. Item 1\n2. Item 2\n3. Item 3";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle multi-digit list markers and add newlines after list", () => {
+			const input = "9. Item 9\n10. Item 10\n11. Item 11\nText after list";
+			const expected = "9. Item 9\n10. Item 10\n11. Item 11\n\nText after list";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		// Newline Behavior
+		it("should add extra newlines when ordered list is followed by content", () => {
+			const input = "1. Item 1\n2. Item 2\n3. Item 3\nNormal text after";
+			const expected = "1. Item 1\n2. Item 2\n3. Item 3\n\nNormal text after";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should not add extra newlines when ordered list is the last thing in input", () => {
+			const input = "1. Item 1\n2. Item 2\n3. Item 3";
+			const expected = "1. Item 1\n2. Item 2\n3. Item 3";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should not add extra newlines if already present", () => {
+			const input = "1. Item 1\n2. Item 2\n3. Item 3\n\nNormal text";
+			const expected = "1. Item 1\n2. Item 2\n3. Item 3\n\nNormal text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		// Formatting
+		it("should handle bold text inside ordered list items", () => {
+			const input = "1. Item with *bold* text";
+			const expected = "1. Item with **bold** text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle italic text inside ordered list items", () => {
+			const input = "1. Item with _italic_ text";
+			const expected = "1. Item with _italic_ text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle strikethrough text inside ordered list items", () => {
+			const input = "1. Item with ~strikethrough~ text";
+			const expected = "1. Item with ~~strikethrough~~ text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle inline code inside ordered list items", () => {
+			const input = "1. Item with `code` text";
+			const expected = "1. Item with `code` text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		// Special Elements
+		it("should handle links inside ordered list items", () => {
+			const input = "1. Item with <https://example.com|link>";
+			const expected = "1. Item with [link](https://example.com)";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		it("should handle HTML entities inside ordered list items", () => {
+			const input = "1. Item with &lt; symbol and &gt; symbol";
+			const expected = "1. Item with < symbol and > symbol";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+		
+		// Edge Cases
+		it("should handle non-sequential numbers in ordered lists", () => {
+			const input = "1. Item one\n3. Item three\n7. Item seven\nText after list";
+			const expected = "1. Item one\n3. Item three\n7. Item seven\n\nText after list";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
 	});
 
 	it("should convert HTML entity &gt; to > symbol", () => {
