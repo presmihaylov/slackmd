@@ -106,42 +106,60 @@ const isLinkStart = (input: StateMachineInput): boolean => {
 const isBeginningOfLine = (input: StateMachineInput): boolean => {
 	// True if we're at the start of the input
 	if (input.previousTokens.length === 0) return true;
-	
+
 	// True if the previous token is a newline
 	return input.previousTokens[input.previousTokens.length - 1] === "\n";
+};
+
+// Helper function to check if next tokens start a blockquote with HTML entity
+const isHtmlEntityBlockquote = (tokens: string[]): boolean => {
+	// Need at least 4 tokens: &, g, t, ;
+	if (tokens.length < 4) return false;
+
+	// Check if tokens form &gt;
+	return (
+		tokens[0] === "&" &&
+		tokens[1] === "g" &&
+		tokens[2] === "t" &&
+		tokens[3] === ";"
+	);
 };
 
 // Helper function to check for inline code formatting
 const isInlineCode = (input: StateMachineInput): boolean => {
 	// Check if current token is a backtick but not part of triple backticks
 	if (input.currentToken !== "`") return false;
-	
+
 	// It's not inline code if it's part of a code block start
-	if (input.nextTokens.length >= 2 && 
-	    input.nextTokens[0] === "`" && 
-	    input.nextTokens[1] === "`") {
+	if (
+		input.nextTokens.length >= 2 &&
+		input.nextTokens[0] === "`" &&
+		input.nextTokens[1] === "`"
+	) {
 		return false;
 	}
-	
+
 	// Check if there's another backtick in next tokens
-	return input.nextTokens.some(token => token === "`");
+	return input.nextTokens.some((token) => token === "`");
 };
 
 // Helper function to check for bullet list markers
 const isBulletListMarker = (input: StateMachineInput): boolean => {
 	// Check if we're at the beginning of a line
 	if (!isBeginningOfLine(input)) return false;
-	
+
 	// Check for bullet character
 	if (input.currentToken === "\u2022") return true;
-	
+
 	// Check for asterisk bullet (* )
-	if (input.currentToken === "*" && 
-	    input.nextTokens.length > 0 && 
-	    input.nextTokens[0] === " ") {
+	if (
+		input.currentToken === "*" &&
+		input.nextTokens.length > 0 &&
+		input.nextTokens[0] === " "
+	) {
 		return true;
 	}
-	
+
 	return false;
 };
 
@@ -149,24 +167,26 @@ const isBulletListMarker = (input: StateMachineInput): boolean => {
 const isOrderedListMarker = (input: StateMachineInput): boolean => {
 	// Check if we're at the beginning of a line
 	if (!isBeginningOfLine(input)) return false;
-	
+
 	// Check if current token is a digit
 	if (!/\d/.test(input.currentToken)) return false;
-	
+
 	// Look ahead for a period followed by a space
 	// Need at least 2 characters ahead (period and space)
 	if (input.nextTokens.length < 2) return false;
-	
+
 	// Continue reading digits until we hit non-digit
 	let i = 0;
 	while (i < input.nextTokens.length && /\d/.test(input.nextTokens[i] || "")) {
 		i++;
 	}
-	
+
 	// Check if the next character after digits is a period followed by space
-	return i < input.nextTokens.length - 1 && 
-	       (input.nextTokens[i] || "") === "." && 
-	       (input.nextTokens[i + 1] || "") === " ";
+	return (
+		i < input.nextTokens.length - 1 &&
+		(input.nextTokens[i] || "") === "." &&
+		(input.nextTokens[i + 1] || "") === " "
+	);
 };
 
 const createFormattedTextStateHandler = (
@@ -258,12 +278,33 @@ const handleSpecialCharacters = (
 		sm.log.debug(
 			`Converting HTML entity &gt; to > at position ${input.previousTokens.length}`,
 		);
-		
+
 		// Check if this ">" should start a blockquote
 		if (isBeginningOfLine(input) && nextState === "TEXT") {
+			// Look ahead to check if the next line is also a blockquote with HTML entity
+			const isNextLineBlockquoteHtmlEntity =
+				input.nextTokens.indexOf("\n") !== -1 &&
+				input.nextTokens.indexOf("\n") + 1 < input.nextTokens.length &&
+				input.nextTokens
+					.slice(input.nextTokens.indexOf("\n") + 1)
+					.join("")
+					.startsWith("&gt;");
+
+			// Look ahead to check if this blockquote follows another blockquote
+			const isPreviousLineBlockquote =
+				input.previousTokens.length >= 2 &&
+				input.previousTokens[input.previousTokens.length - 1] === "\n" &&
+				input.previousTokens[input.previousTokens.length - 2] === ">";
+
 			sm.log.debug(
 				`HTML entity &gt; at the beginning of a line - entering blockquote state`,
 			);
+
+			// If we detect consecutive blockquotes, we need to handle them specially
+			if (isPreviousLineBlockquote || isNextLineBlockquoteHtmlEntity) {
+				sm.log.debug(`Detected consecutive blockquotes with HTML entities`);
+			}
+
 			return {
 				...sm,
 				result: sm.result + ">",
@@ -275,7 +316,7 @@ const handleSpecialCharacters = (
 				},
 			};
 		}
-		
+
 		return {
 			...sm,
 			result: sm.result + ">",
@@ -338,43 +379,46 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		}
-		
+
 		// Check if we've reached a newline (end of the current list item)
 		if (input.currentToken === "\n") {
 			// Look ahead to check if the next line is another list item
-			const isFollowedByListItem = 
-				input.nextTokens.length > 0 && 
-				(isBulletListMarker({ 
-					previousTokens: [...input.previousTokens, input.currentToken], 
-					currentToken: input.nextTokens[0] || "", 
-					nextTokens: input.nextTokens.slice(1) 
-				}) || isOrderedListMarker({ 
-					previousTokens: [...input.previousTokens, input.currentToken], 
-					currentToken: input.nextTokens[0] || "", 
-					nextTokens: input.nextTokens.slice(1) 
-				}));
-			
+			const isFollowedByListItem =
+				input.nextTokens.length > 0 &&
+				(isBulletListMarker({
+					previousTokens: [...input.previousTokens, input.currentToken],
+					currentToken: input.nextTokens[0] || "",
+					nextTokens: input.nextTokens.slice(1),
+				}) ||
+					isOrderedListMarker({
+						previousTokens: [...input.previousTokens, input.currentToken],
+						currentToken: input.nextTokens[0] || "",
+						nextTokens: input.nextTokens.slice(1),
+					}));
+
 			// If the next line isn't a list item, exit the list state and add an extra newline
 			if (!isFollowedByListItem) {
 				sm.log.debug(
 					`Exiting bullet list at token position ${input.previousTokens.length}`,
 				);
-				
+
 				// Check if we need to add an extra newline for proper markdown spacing
-				const hasDoubleNewline = 
-					input.nextTokens.length > 0 && 
-					input.nextTokens[0] === "\n";
-					
+				const hasDoubleNewline =
+					input.nextTokens.length > 0 && input.nextTokens[0] === "\n";
+
 				return {
 					...sm,
-					result: sm.result + "\n" + (hasDoubleNewline || input.nextTokens.length === 0 ? "" : "\n"),
+					result:
+						sm.result +
+						"\n" +
+						(hasDoubleNewline || input.nextTokens.length === 0 ? "" : "\n"),
 					currentState: {
 						state: "TEXT",
 						prevState: "BULLET_LIST",
 					},
 				};
 			}
-			
+
 			// If the next line is another list item, just add the newline and continue
 			return {
 				...sm,
@@ -385,7 +429,7 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		}
-		
+
 		// Handle formatted text inside bullet list
 		if (isLinkStart(input)) {
 			sm.log.debug(
@@ -438,7 +482,7 @@ const states: Record<string, StateHandler> = {
 				currentState: { state: "INLINE_CODE", prevState: "BULLET_LIST" },
 			};
 		}
-		
+
 		// Handle special characters
 		const specialCharsResult = handleSpecialCharacters(
 			sm,
@@ -449,18 +493,18 @@ const states: Record<string, StateHandler> = {
 		if (specialCharsResult !== null) {
 			return specialCharsResult;
 		}
-		
+
 		// Normal case - just add the character and continue in BULLET_LIST state
 		return {
 			...sm,
 			result: sm.result + input.currentToken,
 			currentState: {
-				state: "BULLET_LIST", 
+				state: "BULLET_LIST",
 				prevState: sm.currentState.prevState,
 			},
 		};
 	},
-	
+
 	TEXT: (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		// Check for blockquote start if we're at the beginning of a line and the current token is ">"
 		if (isBeginningOfLine(input) && input.currentToken === ">") {
@@ -477,7 +521,7 @@ const states: Record<string, StateHandler> = {
 			sm.log.debug(
 				`Detected bullet list at token position ${input.previousTokens.length}`,
 			);
-			
+
 			// Handle the bullet character appropriately
 			if (input.currentToken === "\u2022") {
 				return {
@@ -498,7 +542,7 @@ const states: Record<string, StateHandler> = {
 			sm.log.debug(
 				`Detected ordered list at token position ${input.previousTokens.length}`,
 			);
-			
+
 			// Add the current digit and continue in BULLET_LIST state
 			// (we use the same state for both bullet and ordered lists)
 			return {
@@ -764,20 +808,20 @@ const states: Record<string, StateHandler> = {
 		// Check if we've reached a newline that's not followed by a ">" character
 		if (input.currentToken === "\n") {
 			// Look ahead to see if the next non-whitespace token is a ">"
-			const isFollowedByBlockquote = 
-				input.nextTokens.length > 0 && 
-				input.nextTokens[0] === ">";
-			
+			const isFollowedByBlockquote =
+				input.nextTokens.length > 0 &&
+				(input.nextTokens[0] === ">" ||
+					isHtmlEntityBlockquote(input.nextTokens));
+
 			if (!isFollowedByBlockquote) {
 				sm.log.debug(
 					`Exiting blockquote at token position ${input.previousTokens.length}`,
 				);
-				
+
 				// Check if we need to add an extra newline for proper markdown spacing
-				const hasDoubleNewline = 
-					input.nextTokens.length > 0 && 
-					input.nextTokens[0] === "\n";
-					
+				const hasDoubleNewline =
+					input.nextTokens.length > 0 && input.nextTokens[0] === "\n";
+
 				return {
 					...sm,
 					result: sm.result + "\n" + (hasDoubleNewline ? "" : "\n"),
@@ -787,7 +831,7 @@ const states: Record<string, StateHandler> = {
 					},
 				};
 			}
-			
+
 			// If it's a newline followed by ">", just add the newline and continue
 			return {
 				...sm,
@@ -798,7 +842,7 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		}
-		
+
 		// Handle all the special states just like in TEXT mode
 		if (isLinkStart(input)) {
 			sm.log.debug(
@@ -818,10 +862,10 @@ const states: Record<string, StateHandler> = {
 			sm.log.debug(
 				`Detected code block inside blockquote at token position ${input.previousTokens.length}`,
 			);
-			
+
 			const hasNewlineAfterOpening =
 				input.nextTokens.length > 2 && input.nextTokens[2] === "\n";
-				
+
 			return {
 				...sm,
 				result: sm.result + "```" + (hasNewlineAfterOpening ? "" : "\n"),
@@ -882,7 +926,7 @@ const states: Record<string, StateHandler> = {
 				},
 			};
 		}
-		
+
 		const specialCharsResult = handleSpecialCharacters(
 			sm,
 			input,
@@ -892,18 +936,18 @@ const states: Record<string, StateHandler> = {
 		if (specialCharsResult !== null) {
 			return specialCharsResult;
 		}
-		
+
 		// Normal case - just add the character and continue
 		return {
 			...sm,
 			result: sm.result + input.currentToken,
 			currentState: {
-				state: "BLOCKQUOTE", 
+				state: "BLOCKQUOTE",
 				prevState: sm.currentState.prevState,
 			},
 		};
 	},
-	
+
 	SKIP_TOKENS: (sm: StateMachine, _input: StateMachineInput): StateMachine => {
 		if (sm.currentState.state !== "SKIP_TOKENS") {
 			sm.log.error(

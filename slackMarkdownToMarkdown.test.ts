@@ -581,5 +581,43 @@ describe("slackMarkdownToMarkdown", () => {
 				"> **Bold text with > symbol**\n> _Italic with < symbol_\n\nNext line";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
+		describe("HTML-encoded blockquotes", () => {
+			it("should convert &gt; at the beginning of a line to a blockquote", () => {
+				const input = "&gt; This is a blockquote using HTML entity";
+				const expected = "> This is a blockquote using HTML entity";
+				expect(slackMarkdownToMarkdown(input)).toBe(expected);
+			});
+
+			it("should convert &gt; at the beginning of a line to a blockquote and add newlines when followed by content", () => {
+				const input = "&gt; Blockquote with HTML entity\nText after";
+				const expected = "> Blockquote with HTML entity\n\nText after";
+				expect(slackMarkdownToMarkdown(input)).toBe(expected);
+			});
+
+			it("should handle multiple lines of blockquotes with HTML entities", () => {
+				const input = "&gt; Line 1\n&gt; Line 2\n&gt; Line 3";
+				const expected = "> Line 1\n> Line 2\n> Line 3";
+				expect(slackMarkdownToMarkdown(input)).toBe(expected);
+			});
+
+			it("should handle formatting inside blockquotes with HTML entities", () => {
+				const input = "&gt; Text with *bold* and _italic_ and ~strikethrough~";
+				const expected =
+					"> Text with **bold** and _italic_ and ~~strikethrough~~";
+				expect(slackMarkdownToMarkdown(input)).toBe(expected);
+			});
+
+			it("should handle links inside blockquotes with HTML entities", () => {
+				const input = "&gt; Check out <https://example.com|Example Site>";
+				const expected = "> Check out [Example Site](https://example.com)";
+				expect(slackMarkdownToMarkdown(input)).toBe(expected);
+			});
+
+			it("should handle mixed standard blockquotes and HTML entity blockquotes", () => {
+				const input = "> Standard blockquote\n&gt; HTML entity blockquote";
+				const expected = "> Standard blockquote\n> HTML entity blockquote";
+				expect(slackMarkdownToMarkdown(input)).toBe(expected);
+			});
+		});
 	});
 });
