@@ -1,6 +1,6 @@
 {
     "name": "@presmihaylov/slackmd",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Convert Slack markdown to standard markdown",
     "module": "dist/index.js",
     "main": "dist/index.js",

@@ -481,7 +481,8 @@ const states: Record<string, StateHandler> = {
 				`Detected ordered list at token position ${input.previousTokens.length}`,
 			);
 			
-			// Add the current digit
+			// Add the current digit and continue in BULLET_LIST state
+			// (we use the same state for both bullet and ordered lists)
 			return {
 				...sm,
 				result: sm.result + input.currentToken,
