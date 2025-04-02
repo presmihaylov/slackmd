@@ -5,6 +5,7 @@ export type StateKey =
 	| "STRIKETHROUGH"
 	| "INLINE_CODE"
 	| "CODE_BLOCK"
+	| "BLOCKQUOTE"
 	| "LINK"
 	| "SKIP_TOKENS"
 	| "END";
@@ -98,6 +99,31 @@ const isLinkStart = (input: StateMachineInput): boolean => {
 	// Look for http or https at the start
 	const nextChars = input.nextTokens.slice(0, 8).join("");
 	return nextChars.startsWith("http://") || nextChars.startsWith("https://");
+};
+
+// Helper function to check if we're at the beginning of a line
+const isBeginningOfLine = (input: StateMachineInput): boolean => {
+	// True if we're at the start of the input
+	if (input.previousTokens.length === 0) return true;
+	
+	// True if the previous token is a newline
+	return input.previousTokens[input.previousTokens.length - 1] === "\n";
+};
+
+// Helper function to check for inline code formatting
+const isInlineCode = (input: StateMachineInput): boolean => {
+	// Check if current token is a backtick but not part of triple backticks
+	if (input.currentToken !== "`") return false;
+	
+	// It's not inline code if it's part of a code block start
+	if (input.nextTokens.length >= 2 && 
+	    input.nextTokens[0] === "`" && 
+	    input.nextTokens[1] === "`") {
+		return false;
+	}
+	
+	// Check if there's another backtick in next tokens
+	return input.nextTokens.some(token => token === "`");
 };
 
 const createFormattedTextStateHandler = (
@@ -237,7 +263,17 @@ const handleSpecialCharacters = (
 
 const states: Record<string, StateHandler> = {
 	TEXT: (sm: StateMachine, input: StateMachineInput): StateMachine => {
-		if (isLinkStart(input)) {
+		// Check for blockquote start if we're at the beginning of a line and the current token is ">"
+		if (isBeginningOfLine(input) && input.currentToken === ">") {
+			sm.log.debug(
+				`Detected blockquote start at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + ">",
+				currentState: { state: "BLOCKQUOTE", prevState: "TEXT" },
+			};
+		} else if (isLinkStart(input)) {
 			// Enter link mode
 			sm.log.debug(
 				`Detected link start at token position ${input.previousTokens.length}`,
@@ -300,6 +336,15 @@ const states: Record<string, StateHandler> = {
 				...sm,
 				result: sm.result + "~~",
 				currentState: { state: "STRIKETHROUGH", prevState: "TEXT" },
+			};
+		} else if (isInlineCode(input)) {
+			sm.log.debug(
+				`Entering inline code at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "`",
+				currentState: { state: "INLINE_CODE", prevState: "TEXT" },
 			};
 		} else if (input.currentToken === "\u2022") {
 			// bullet point
@@ -482,6 +527,150 @@ const states: Record<string, StateHandler> = {
 	END: (sm: StateMachine, _input: StateMachineInput): StateMachine => {
 		return sm;
 	},
+	BLOCKQUOTE: (sm: StateMachine, input: StateMachineInput): StateMachine => {
+		// Check if we've reached a newline that's not followed by a ">" character
+		if (input.currentToken === "\n") {
+			// Look ahead to see if the next non-whitespace token is a ">"
+			const isFollowedByBlockquote = 
+				input.nextTokens.length > 0 && 
+				input.nextTokens[0] === ">";
+			
+			if (!isFollowedByBlockquote) {
+				sm.log.debug(
+					`Exiting blockquote at token position ${input.previousTokens.length}`,
+				);
+				
+				// Check if we need to add an extra newline for proper markdown spacing
+				const hasDoubleNewline = 
+					input.nextTokens.length > 0 && 
+					input.nextTokens[0] === "\n";
+					
+				return {
+					...sm,
+					result: sm.result + "\n" + (hasDoubleNewline ? "" : "\n"),
+					currentState: {
+						state: "TEXT",
+						prevState: "BLOCKQUOTE",
+					},
+				};
+			}
+			
+			// If it's a newline followed by ">", just add the newline and continue
+			return {
+				...sm,
+				result: sm.result + input.currentToken,
+				currentState: {
+					state: "BLOCKQUOTE",
+					prevState: sm.currentState.prevState,
+				},
+			};
+		}
+		
+		// Handle all the special states just like in TEXT mode
+		if (isLinkStart(input)) {
+			sm.log.debug(
+				`Detected link inside blockquote at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				currentState: {
+					state: "LINK",
+					url: "",
+					displayText: null,
+					parsingPhase: "url",
+					prevState: "BLOCKQUOTE",
+				},
+			};
+		} else if (isCodeBlockStart(input)) {
+			sm.log.debug(
+				`Detected code block inside blockquote at token position ${input.previousTokens.length}`,
+			);
+			
+			const hasNewlineAfterOpening =
+				input.nextTokens.length > 2 && input.nextTokens[2] === "\n";
+				
+			return {
+				...sm,
+				result: sm.result + "```" + (hasNewlineAfterOpening ? "" : "\n"),
+				currentState: {
+					state: "SKIP_TOKENS",
+					tokensToSkip: 2,
+					nextState: "CODE_BLOCK",
+					prevState: "BLOCKQUOTE",
+				},
+			};
+		} else if (shouldEnterFormattedText(input, "*")) {
+			sm.log.debug(
+				`Entering bold text inside blockquote at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "**",
+				currentState: { state: "BOLD", prevState: "BLOCKQUOTE" },
+			};
+		} else if (shouldEnterFormattedText(input, "_")) {
+			sm.log.debug(
+				`Entering italic text inside blockquote at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "_",
+				currentState: { state: "ITALIC", prevState: "BLOCKQUOTE" },
+			};
+		} else if (shouldEnterFormattedText(input, "~")) {
+			sm.log.debug(
+				`Entering strikethrough text inside blockquote at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "~~",
+				currentState: { state: "STRIKETHROUGH", prevState: "BLOCKQUOTE" },
+			};
+		} else if (isInlineCode(input)) {
+			sm.log.debug(
+				`Entering inline code inside blockquote at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "`",
+				currentState: { state: "INLINE_CODE", prevState: "BLOCKQUOTE" },
+			};
+		} else if (input.currentToken === "\u2022") {
+			// bullet point
+			sm.log.debug(
+				`Converting bullet point inside blockquote at token position ${input.previousTokens.length}`,
+			);
+			return {
+				...sm,
+				result: sm.result + "*",
+				currentState: {
+					state: "BLOCKQUOTE",
+					prevState: sm.currentState.prevState,
+				},
+			};
+		}
+		
+		const specialCharsResult = handleSpecialCharacters(
+			sm,
+			input,
+			"BLOCKQUOTE",
+			"BLOCKQUOTE",
+		);
+		if (specialCharsResult !== null) {
+			return specialCharsResult;
+		}
+		
+		// Normal case - just add the character and continue
+		return {
+			...sm,
+			result: sm.result + input.currentToken,
+			currentState: {
+				state: "BLOCKQUOTE", 
+				prevState: sm.currentState.prevState,
+			},
+		};
+	},
+	
 	SKIP_TOKENS: (sm: StateMachine, _input: StateMachineInput): StateMachine => {
 		if (sm.currentState.state !== "SKIP_TOKENS") {
 			sm.log.error(

@@ -284,4 +284,114 @@ describe("slackMarkdownToMarkdown", () => {
 		const expected = "[Visit *Example* Site](https://example.com)";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
+
+	// Blockquote tests
+	describe("Blockquotes", () => {
+		// Basic blockquote functionality
+		it("should convert a simple blockquote and add newlines when followed by content", () => {
+			const input = "> This is a blockquote\nSome text after";
+			const expected = "> This is a blockquote\n\nSome text after";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle multiline blockquotes and add newlines when followed by content", () => {
+			const input = "> Line 1\n> Line 2\n> Line 3\nSome text after";
+			const expected = "> Line 1\n> Line 2\n> Line 3\n\nSome text after";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should not add extra newlines when blockquote is the last thing in input", () => {
+			const input = "> This is a blockquote at the end";
+			const expected = "> This is a blockquote at the end";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should not add extra newlines if already present", () => {
+			const input = "> This is a blockquote\n\nNormal text";
+			const expected = "> This is a blockquote\n\nNormal text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		// Formatting within blockquotes
+		it("should handle bold text within blockquote", () => {
+			const input = "> This has *bold* text\nNext line";
+			const expected = "> This has **bold** text\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle italic text within blockquote", () => {
+			const input = "> This has _italic_ text\nNext line";
+			const expected = "> This has _italic_ text\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle strikethrough within blockquote", () => {
+			const input = "> This has ~strikethrough~ text\nNext line";
+			const expected = "> This has ~~strikethrough~~ text\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle inline code in blockquotes", () => {
+			const input = "> Use the `console.log()` function\nNext line";
+			const expected = "> Use the `console.log()` function\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle mixed formatting in blockquotes", () => {
+			const input = "> This has *bold* and _italic_ and ~strikethrough~ text\nNext line";
+			const expected = "> This has **bold** and _italic_ and ~~strikethrough~~ text\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		// Other elements within blockquotes
+		it("should handle links within blockquote", () => {
+			const input = "> Check out <https://example.com>\nNext line";
+			const expected = "> Check out [https://example.com](https://example.com)\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle links with display text in blockquotes", () => {
+			const input = "> Check out <https://example.com|Example Site>\nNext line";
+			const expected = "> Check out [Example Site](https://example.com)\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle HTML entities in blockquotes", () => {
+			const input = "> This is &lt; than that and this is &gt; than this\nNext line";
+			const expected = "> This is < than that and this is > than this\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle bullet points in blockquotes", () => {
+			const input = "> \u2022 Item 1\n> \u2022 Item 2\nNext line";
+			const expected = "> * Item 1\n> * Item 2\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		// Edge cases
+		it("should handle blockquote followed immediately by another blockquote", () => {
+			const input = "> First blockquote\n\n> Second blockquote\nSome text";
+			const expected = "> First blockquote\n\n> Second blockquote\n\nSome text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should not treat > in the middle of text as a blockquote", () => {
+			const input = "This is greater than > symbol in text";
+			const expected = "This is greater than > symbol in text";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should not start blockquote state when > appears in code block", () => {
+			const input = "```\nif (x > 10) {\n  return true;\n}\n```";
+			const expected = "```\nif (x > 10) {\n  return true;\n}\n```";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		// Complex combinations
+		it("should handle blockquotes with formatted text containing special characters", () => {
+			const input = "> *Bold text with > symbol*\n> _Italic with < symbol_\nNext line";
+			const expected = "> **Bold text with > symbol**\n> _Italic with < symbol_\n\nNext line";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+	});
 });
