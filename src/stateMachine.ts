@@ -13,6 +13,7 @@ export type BasicStateKey = Exclude<StateKey, "SKIP_TOKENS" | "LINK">;
 
 export type BasicStateData = {
 	state: BasicStateKey;
+	prevState: BasicStateKey;
 };
 
 export type LinkStateData = {
@@ -20,13 +21,14 @@ export type LinkStateData = {
 	url: string;
 	displayText: string | null;
 	parsingPhase: "url" | "displayText" | "closing";
-	nextState: BasicStateKey; // State to return to after link is complete
+	prevState: BasicStateKey;
 };
 
 export type SkipTokensStateData = {
 	state: "SKIP_TOKENS";
 	tokensToSkip: number;
 	nextState: BasicStateKey;
+	prevState: BasicStateKey;
 };
 
 export type StateData = BasicStateData | LinkStateData | SkipTokensStateData;
@@ -105,12 +107,16 @@ const createFormattedTextStateHandler = (
 ): StateHandler => {
 	return (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		if (input.currentToken === formatToken) {
-			sm.log.debug(`Exiting ${stateKey.toLowerCase()} formatting at position ${input.previousTokens.length}`);
+			sm.log.debug(
+				`Exiting ${stateKey.toLowerCase()} formatting at position ${input.previousTokens.length}`,
+			);
 			return {
 				...sm,
 				result: sm.result + formatToken.repeat(times),
 				currentState: {
-					state: input.nextTokens.length > 0 ? "TEXT" : "END",
+					state:
+						input.nextTokens.length > 0 ? sm.currentState.prevState : "END",
+					prevState: stateKey,
 				},
 			};
 		}
@@ -118,7 +124,9 @@ const createFormattedTextStateHandler = (
 		// Check for link start, even in formatted text
 		if (isLinkStart(input)) {
 			// Enter link mode
-			sm.log.debug(`Detected link inside ${stateKey.toLowerCase()} text at position ${input.previousTokens.length}`);
+			sm.log.debug(
+				`Detected link inside ${stateKey.toLowerCase()} text at position ${input.previousTokens.length}`,
+			);
 			return {
 				...sm,
 				// Don't add the opening < to the result
@@ -127,7 +135,7 @@ const createFormattedTextStateHandler = (
 					url: "",
 					displayText: null,
 					parsingPhase: "url",
-					nextState: stateKey,
+					prevState: stateKey,
 				},
 			};
 		}
@@ -142,6 +150,7 @@ const createFormattedTextStateHandler = (
 			result: sm.result + input.currentToken,
 			currentState: {
 				state: stateKey,
+				prevState: sm.currentState.prevState,
 			},
 		};
 	};
@@ -171,7 +180,9 @@ const handleSpecialCharacters = (
 ): StateMachine | null => {
 	if (isHtmlEntity(input, "&gt;")) {
 		// Convert &gt; to >
-		sm.log.debug(`Converting HTML entity &gt; to > at position ${input.previousTokens.length}`);
+		sm.log.debug(
+			`Converting HTML entity &gt; to > at position ${input.previousTokens.length}`,
+		);
 		return {
 			...sm,
 			result: sm.result + ">",
@@ -179,11 +190,14 @@ const handleSpecialCharacters = (
 				state: "SKIP_TOKENS",
 				tokensToSkip: 3, // Skip 'g', 't', ';'
 				nextState,
+				prevState: "TEXT",
 			},
 		};
 	} else if (isHtmlEntity(input, "&lt;")) {
 		// Convert &lt; to <
-		sm.log.debug(`Converting HTML entity &lt; to < at position ${input.previousTokens.length}`);
+		sm.log.debug(
+			`Converting HTML entity &lt; to < at position ${input.previousTokens.length}`,
+		);
 		return {
 			...sm,
 			result: sm.result + "<",
@@ -191,11 +205,14 @@ const handleSpecialCharacters = (
 				state: "SKIP_TOKENS",
 				tokensToSkip: 3, // Skip 'l', 't', ';'
 				nextState,
+				prevState: "TEXT",
 			},
 		};
 	} else if (isHtmlEntity(input, "&amp;")) {
 		// Convert &amp; to &
-		sm.log.debug(`Converting HTML entity &amp; to & at position ${input.previousTokens.length}`);
+		sm.log.debug(
+			`Converting HTML entity &amp; to & at position ${input.previousTokens.length}`,
+		);
 		return {
 			...sm,
 			result: sm.result + "&",
@@ -203,6 +220,7 @@ const handleSpecialCharacters = (
 				state: "SKIP_TOKENS",
 				tokensToSkip: 4, // Skip 'a', 'm', 'p', ';'
 				nextState,
+				prevState: "TEXT",
 			},
 		};
 	}
@@ -215,7 +233,9 @@ const states: Record<string, StateHandler> = {
 	TEXT: (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		if (isLinkStart(input)) {
 			// Enter link mode
-			sm.log.debug(`Detected link start at token position ${input.previousTokens.length}`);
+			sm.log.debug(
+				`Detected link start at token position ${input.previousTokens.length}`,
+			);
 			return {
 				...sm,
 				// Don't add the opening < to the result
@@ -224,16 +244,19 @@ const states: Record<string, StateHandler> = {
 					url: "",
 					displayText: null,
 					parsingPhase: "url",
-					nextState: "TEXT",
+					prevState: "TEXT",
 				},
 			};
 		} else if (isCodeBlockStart(input)) {
 			// Enter code block mode (triple backticks)
-			sm.log.debug(`Detected code block start at token position ${input.previousTokens.length}`);
-			
+			sm.log.debug(
+				`Detected code block start at token position ${input.previousTokens.length}`,
+			);
+
 			// Check if the next token after the triple backticks is a newline
-			const hasNewlineAfterOpening = input.nextTokens.length > 2 && input.nextTokens[2] === "\n";
-			
+			const hasNewlineAfterOpening =
+				input.nextTokens.length > 2 && input.nextTokens[2] === "\n";
+
 			return {
 				...sm,
 				// Add a newline after the opening ``` if one is not already present
@@ -242,37 +265,48 @@ const states: Record<string, StateHandler> = {
 					state: "SKIP_TOKENS",
 					tokensToSkip: 2, // Skip the next two backticks
 					nextState: "CODE_BLOCK",
+					prevState: "TEXT",
 				},
 			};
 		} else if (shouldEnterFormattedText(input, "*")) {
-			sm.log.debug(`Entering bold text at token position ${input.previousTokens.length}`);
+			sm.log.debug(
+				`Entering bold text at token position ${input.previousTokens.length}`,
+			);
 			return {
 				...sm,
 				result: sm.result + "**",
-				currentState: { state: "BOLD" },
+				currentState: { state: "BOLD", prevState: "TEXT" },
 			};
 		} else if (shouldEnterFormattedText(input, "_")) {
-			sm.log.debug(`Entering italic text at token position ${input.previousTokens.length}`);
+			sm.log.debug(
+				`Entering italic text at token position ${input.previousTokens.length}`,
+			);
 			return {
 				...sm,
 				result: sm.result + "_",
-				currentState: { state: "ITALIC" },
+				currentState: { state: "ITALIC", prevState: "TEXT" },
 			};
 		} else if (shouldEnterFormattedText(input, "~")) {
-			sm.log.debug(`Entering strikethrough text at token position ${input.previousTokens.length}`);
+			sm.log.debug(
+				`Entering strikethrough text at token position ${input.previousTokens.length}`,
+			);
 			return {
 				...sm,
 				result: sm.result + "~~",
-				currentState: { state: "STRIKETHROUGH" },
+				currentState: { state: "STRIKETHROUGH", prevState: "TEXT" },
 			};
 		} else if (input.currentToken === "\u2022") {
 			// bullet point
-			sm.log.debug(`Converting bullet point at token position ${input.previousTokens.length}`);
+			sm.log.debug(
+				`Converting bullet point at token position ${input.previousTokens.length}`,
+			);
 			return {
 				...sm,
 				result: sm.result + "*",
 				currentState: {
 					state: input.nextTokens.length > 0 ? "TEXT" : "END",
+					prevState:
+						input.nextTokens.length > 0 ? sm.currentState.prevState : "TEXT",
 				},
 			};
 		}
@@ -287,6 +321,8 @@ const states: Record<string, StateHandler> = {
 			result: sm.result + input.currentToken,
 			currentState: {
 				state: input.nextTokens.length > 0 ? "TEXT" : "END",
+				prevState:
+					input.nextTokens.length > 0 ? sm.currentState.prevState : "TEXT",
 			},
 		};
 	},
@@ -298,12 +334,15 @@ const states: Record<string, StateHandler> = {
 		// Check for code block end (triple backticks)
 		if (isCodeBlockStart(input)) {
 			// Skip the next two backticks
-			sm.log.debug(`Detected code block end at token position ${input.previousTokens.length}`);
-			
+			sm.log.debug(
+				`Detected code block end at token position ${input.previousTokens.length}`,
+			);
+
 			// Check if the last character before closing ``` is a newline
-			const hasNewlineBeforeClosing = input.previousTokens.length > 0 && 
+			const hasNewlineBeforeClosing =
+				input.previousTokens.length > 0 &&
 				input.previousTokens[input.previousTokens.length - 1] === "\n";
-			
+
 			return {
 				...sm,
 				// Add a newline before the closing ``` if one is not already present
@@ -312,6 +351,7 @@ const states: Record<string, StateHandler> = {
 					state: "SKIP_TOKENS",
 					tokensToSkip: 2, // Skip the next two backticks
 					nextState: "TEXT",
+					prevState: "CODE_BLOCK",
 				},
 			};
 		}
@@ -319,7 +359,9 @@ const states: Record<string, StateHandler> = {
 		// Check for link start, even in code blocks
 		if (isLinkStart(input)) {
 			// Enter link mode
-			sm.log.debug(`Detected link inside code block at token position ${input.previousTokens.length}`);
+			sm.log.debug(
+				`Detected link inside code block at token position ${input.previousTokens.length}`,
+			);
 			return {
 				...sm,
 				// Don't add the opening < to the result
@@ -328,7 +370,7 @@ const states: Record<string, StateHandler> = {
 					url: "",
 					displayText: null,
 					parsingPhase: "url",
-					nextState: "CODE_BLOCK",
+					prevState: "CODE_BLOCK",
 				},
 			};
 		}
@@ -343,7 +385,10 @@ const states: Record<string, StateHandler> = {
 		return {
 			...sm,
 			result: sm.result + input.currentToken,
-			currentState: { state: "CODE_BLOCK" },
+			currentState: {
+				state: "CODE_BLOCK",
+				prevState: sm.currentState.prevState,
+			},
 		};
 	},
 	LINK: (sm: StateMachine, input: StateMachineInput): StateMachine => {
@@ -361,20 +406,25 @@ const states: Record<string, StateHandler> = {
 
 			// Format as markdown link: [display](url)
 			const markdownLink = `[${displayText}](${url})`;
-			sm.log.debug(`Completed link at token position ${input.previousTokens.length}: ${markdownLink}`);
+			sm.log.debug(
+				`Completed link at token position ${input.previousTokens.length}: ${markdownLink}`,
+			);
 
 			return {
 				...sm,
 				result: sm.result + markdownLink,
 				currentState: {
-					state: input.nextTokens.length > 0 ? linkData.nextState : "END",
+					state: input.nextTokens.length > 0 ? linkData.prevState : "END",
+					prevState: linkData.prevState,
 				},
 			};
 		}
 
 		// Handle separator between URL and display text
 		if (input.currentToken === "|" && linkData.parsingPhase === "url") {
-			sm.log.debug(`Link separator found at token position ${input.previousTokens.length}, switching to display text`);
+			sm.log.debug(
+				`Link separator found at token position ${input.previousTokens.length}, switching to display text`,
+			);
 			return {
 				...sm,
 				currentState: {
@@ -408,7 +458,9 @@ const states: Record<string, StateHandler> = {
 		}
 
 		// Fallback - should not reach here
-		sm.log.warn(`Unexpected state in LINK handler at token position ${input.previousTokens.length}`);
+		sm.log.warn(
+			`Unexpected state in LINK handler at token position ${input.previousTokens.length}`,
+		);
 		return sm;
 	},
 	END: (sm: StateMachine, _input: StateMachineInput): StateMachine => {
@@ -416,20 +468,23 @@ const states: Record<string, StateHandler> = {
 	},
 	SKIP_TOKENS: (sm: StateMachine, _input: StateMachineInput): StateMachine => {
 		if (sm.currentState.state !== "SKIP_TOKENS") {
-			sm.log.error(`Expected SKIP_TOKENS state but got ${sm.currentState.state}`);
+			sm.log.error(
+				`Expected SKIP_TOKENS state but got ${sm.currentState.state}`,
+			);
 			throw new Error("Invalid state");
 		}
 
-		const skipData = sm.currentState as SkipTokensStateData;
-		const tokensToSkip = skipData.tokensToSkip;
-
+		const tokensToSkip = sm.currentState.tokensToSkip;
 		if (tokensToSkip <= 1) {
 			// We've skipped all tokens, return to the previous state
-			sm.log.debug(`Finished skipping tokens, returning to ${skipData.nextState} state`);
+			sm.log.debug(
+				`Finished skipping tokens, returning to ${sm.currentState.nextState} state`,
+			);
 			return {
 				...sm,
 				currentState: {
-					state: skipData.nextState,
+					state: sm.currentState.nextState,
+					prevState: sm.currentState.prevState,
 				},
 			};
 		}
@@ -441,7 +496,8 @@ const states: Record<string, StateHandler> = {
 			currentState: {
 				state: "SKIP_TOKENS",
 				tokensToSkip: tokensToSkip - 1,
-				nextState: skipData.nextState,
+				nextState: sm.currentState.nextState,
+				prevState: sm.currentState.prevState,
 			},
 		};
 	},
@@ -459,7 +515,7 @@ export const getState = (machine: StateMachine): StateHandler => {
 
 export const createStateMachine = (log: Logger): StateMachine => {
 	return {
-		currentState: { state: "TEXT" },
+		currentState: { state: "TEXT", prevState: "TEXT" },
 		result: "",
 		log,
 	};
