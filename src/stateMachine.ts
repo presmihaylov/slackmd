@@ -258,6 +258,24 @@ const handleSpecialCharacters = (
 		sm.log.debug(
 			`Converting HTML entity &gt; to > at position ${input.previousTokens.length}`,
 		);
+		
+		// Check if this ">" should start a blockquote
+		if (isBeginningOfLine(input) && nextState === "TEXT") {
+			sm.log.debug(
+				`HTML entity &gt; at the beginning of a line - entering blockquote state`,
+			);
+			return {
+				...sm,
+				result: sm.result + ">",
+				currentState: {
+					state: "SKIP_TOKENS",
+					tokensToSkip: 3, // Skip 'g', 't', ';'
+					nextState: "BLOCKQUOTE",
+					prevState: "TEXT",
+				},
+			};
+		}
+		
 		return {
 			...sm,
 			result: sm.result + ">",

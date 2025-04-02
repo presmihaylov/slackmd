@@ -2,6 +2,15 @@ import { describe, it, expect } from "vitest";
 import { slackMarkdownToMarkdown } from "./index";
 
 describe("slackMarkdownToMarkdown", () => {
+	describe("Real-world scenarios", () => {
+		it("should convert Slack-formatted text to Markdown", () => {
+			const input =
+				"hello\n\u2022 hii\n\u2022 foo\n\u2022 bartr\nlist:\n1. one\n2. two\n3. three\n&gt; heyyy a quote\na full code block\n```yoooo```\na partial `code block` here\n\na *bold* text and _italic_ and ~strikethrough~\n\nand here is <https://example.com|a link>";
+			const expected =
+				"hello\n* hii\n* foo\n* bartr\n\nlist:\n1. one\n2. two\n3. three\n\n> heyyy a quote\n\na full code block\n```\nyoooo\n```\na partial `code block` here\n\na **bold** text and _italic_ and ~~strikethrough~~\n\nand here is [a link](https://example.com)";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+	});
 	it("should return plain text as-is", () => {
 		const input = "This is a plain text string with no markdown";
 		expect(slackMarkdownToMarkdown(input)).toBe(input);
@@ -90,70 +99,72 @@ describe("slackMarkdownToMarkdown", () => {
 			const expected = "* Item 1\n* Item 2\n* Item 3";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should maintain asterisk-based bullet list markers", () => {
 			const input = "* Item 1\n* Item 2\n* Item 3";
 			const expected = "* Item 1\n* Item 2\n* Item 3";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		// Newline Behavior
 		it("should add extra newlines when bullet list is followed by content", () => {
-			const input = "\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3\nNormal text after";
+			const input =
+				"\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3\nNormal text after";
 			const expected = "* Item 1\n* Item 2\n* Item 3\n\nNormal text after";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should not add extra newlines when bullet list is the last thing in input", () => {
 			const input = "\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3";
 			const expected = "* Item 1\n* Item 2\n* Item 3";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should not add extra newlines if already present", () => {
-			const input = "\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3\n\nNormal text";
+			const input =
+				"\u2022 Item 1\n\u2022 Item 2\n\u2022 Item 3\n\nNormal text";
 			const expected = "* Item 1\n* Item 2\n* Item 3\n\nNormal text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		// Formatting
 		it("should handle bold text inside bullet list items", () => {
 			const input = "\u2022 Item with *bold* text";
 			const expected = "* Item with **bold** text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle italic text inside bullet list items", () => {
 			const input = "\u2022 Item with _italic_ text";
 			const expected = "* Item with _italic_ text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle strikethrough text inside bullet list items", () => {
 			const input = "\u2022 Item with ~strikethrough~ text";
 			const expected = "* Item with ~~strikethrough~~ text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle inline code inside bullet list items", () => {
 			const input = "\u2022 Item with `code` text";
 			const expected = "* Item with `code` text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		// Special Elements
 		it("should handle links inside bullet list items", () => {
 			const input = "\u2022 Item with <https://example.com|link>";
 			const expected = "* Item with [link](https://example.com)";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle HTML entities inside bullet list items", () => {
 			const input = "\u2022 Item with &lt; symbol and &gt; symbol";
 			const expected = "* Item with < symbol and > symbol";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		// Edge Cases
 		it("should handle mixed bullet markers in the same list", () => {
 			const input = "\u2022 Item 1\n* Item 2\n\u2022 Item 3";
@@ -161,7 +172,7 @@ describe("slackMarkdownToMarkdown", () => {
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
 	});
-	
+
 	describe("Ordered Lists", () => {
 		// Basic Conversion
 		it("should maintain ordered list markers", () => {
@@ -169,74 +180,76 @@ describe("slackMarkdownToMarkdown", () => {
 			const expected = "1. Item 1\n2. Item 2\n3. Item 3";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle multi-digit list markers and add newlines after list", () => {
 			const input = "9. Item 9\n10. Item 10\n11. Item 11\nText after list";
 			const expected = "9. Item 9\n10. Item 10\n11. Item 11\n\nText after list";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		// Newline Behavior
 		it("should add extra newlines when ordered list is followed by content", () => {
 			const input = "1. Item 1\n2. Item 2\n3. Item 3\nNormal text after";
 			const expected = "1. Item 1\n2. Item 2\n3. Item 3\n\nNormal text after";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should not add extra newlines when ordered list is the last thing in input", () => {
 			const input = "1. Item 1\n2. Item 2\n3. Item 3";
 			const expected = "1. Item 1\n2. Item 2\n3. Item 3";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should not add extra newlines if already present", () => {
 			const input = "1. Item 1\n2. Item 2\n3. Item 3\n\nNormal text";
 			const expected = "1. Item 1\n2. Item 2\n3. Item 3\n\nNormal text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		// Formatting
 		it("should handle bold text inside ordered list items", () => {
 			const input = "1. Item with *bold* text";
 			const expected = "1. Item with **bold** text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle italic text inside ordered list items", () => {
 			const input = "1. Item with _italic_ text";
 			const expected = "1. Item with _italic_ text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle strikethrough text inside ordered list items", () => {
 			const input = "1. Item with ~strikethrough~ text";
 			const expected = "1. Item with ~~strikethrough~~ text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle inline code inside ordered list items", () => {
 			const input = "1. Item with `code` text";
 			const expected = "1. Item with `code` text";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		// Special Elements
 		it("should handle links inside ordered list items", () => {
 			const input = "1. Item with <https://example.com|link>";
 			const expected = "1. Item with [link](https://example.com)";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		it("should handle HTML entities inside ordered list items", () => {
 			const input = "1. Item with &lt; symbol and &gt; symbol";
 			const expected = "1. Item with < symbol and > symbol";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
-		
+
 		// Edge Cases
 		it("should handle non-sequential numbers in ordered lists", () => {
-			const input = "1. Item one\n3. Item three\n7. Item seven\nText after list";
-			const expected = "1. Item one\n3. Item three\n7. Item seven\n\nText after list";
+			const input =
+				"1. Item one\n3. Item three\n7. Item seven\nText after list";
+			const expected =
+				"1. Item one\n3. Item three\n7. Item seven\n\nText after list";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
 	});
@@ -328,7 +341,8 @@ describe("slackMarkdownToMarkdown", () => {
 	});
 
 	it("should handle HTML entities inside code blocks", () => {
-		const input = "```if (x &lt; 10 &amp;&amp; y &gt; 20) { /* do something */ }```";
+		const input =
+			"```if (x &lt; 10 &amp;&amp; y &gt; 20) { /* do something */ }```";
 		const expected = "```\nif (x < 10 && y > 20) { /* do something */ }\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
@@ -340,54 +354,64 @@ describe("slackMarkdownToMarkdown", () => {
 	});
 
 	it("should not convert bold formatting inside a code block", () => {
-		const input = "```\nThis is some code with *asterisks* that should not be converted to bold\nconst message = 'Using *asterisks* for emphasis in comments';\n```";
-		const expected = "```\nThis is some code with *asterisks* that should not be converted to bold\nconst message = 'Using *asterisks* for emphasis in comments';\n```";
+		const input =
+			"```\nThis is some code with *asterisks* that should not be converted to bold\nconst message = 'Using *asterisks* for emphasis in comments';\n```";
+		const expected =
+			"```\nThis is some code with *asterisks* that should not be converted to bold\nconst message = 'Using *asterisks* for emphasis in comments';\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
 	it("should not convert italic formatting inside a code block", () => {
-		const input = "```\nconsole.log('Hello');\n// _This is a comment with underscores_\nlet var_name_with_underscores = 'value';\n```";
-		const expected = "```\nconsole.log('Hello');\n// _This is a comment with underscores_\nlet var_name_with_underscores = 'value';\n```";
+		const input =
+			"```\nconsole.log('Hello');\n// _This is a comment with underscores_\nlet var_name_with_underscores = 'value';\n```";
+		const expected =
+			"```\nconsole.log('Hello');\n// _This is a comment with underscores_\nlet var_name_with_underscores = 'value';\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
 	it("should not convert strikethrough formatting inside a code block", () => {
-		const input = "```\n// Documentation for deprecated functions that will be ~removed~ soon\nfunction legacyFunction() ~deprecated~ {\n  // Implementation\n}\n```";
-		const expected = "```\n// Documentation for deprecated functions that will be ~removed~ soon\nfunction legacyFunction() ~deprecated~ {\n  // Implementation\n}\n```";
+		const input =
+			"```\n// Documentation for deprecated functions that will be ~removed~ soon\nfunction legacyFunction() ~deprecated~ {\n  // Implementation\n}\n```";
+		const expected =
+			"```\n// Documentation for deprecated functions that will be ~removed~ soon\nfunction legacyFunction() ~deprecated~ {\n  // Implementation\n}\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
 	it("should handle a large code block with mixed formatting patterns", () => {
-		const input = "```\n/*\n * This large comment block has examples of:\n * *bold text* that should stay as single asterisks\n * _italic text_ that should stay as single underscores\n * ~strikethrough~ that should stay as single tildes\n */\n\nconst config = {\n  formatting: {\n    bold: '*use asterisks*',\n    italic: '_use underscores_',\n    strike: '~use tildes~',\n    code: '`use backticks`'\n  },\n  examples: [\n    '*not bold*',\n    '_not italic_',\n    '~not strikethrough~'\n  ]\n};\n```";
-		const expected = "```\n/*\n * This large comment block has examples of:\n * *bold text* that should stay as single asterisks\n * _italic text_ that should stay as single underscores\n * ~strikethrough~ that should stay as single tildes\n */\n\nconst config = {\n  formatting: {\n    bold: '*use asterisks*',\n    italic: '_use underscores_',\n    strike: '~use tildes~',\n    code: '`use backticks`'\n  },\n  examples: [\n    '*not bold*',\n    '_not italic_',\n    '~not strikethrough~'\n  ]\n};\n```";
+		const input =
+			"```\n/*\n * This large comment block has examples of:\n * *bold text* that should stay as single asterisks\n * _italic text_ that should stay as single underscores\n * ~strikethrough~ that should stay as single tildes\n */\n\nconst config = {\n  formatting: {\n    bold: '*use asterisks*',\n    italic: '_use underscores_',\n    strike: '~use tildes~',\n    code: '`use backticks`'\n  },\n  examples: [\n    '*not bold*',\n    '_not italic_',\n    '~not strikethrough~'\n  ]\n};\n```";
+		const expected =
+			"```\n/*\n * This large comment block has examples of:\n * *bold text* that should stay as single asterisks\n * _italic text_ that should stay as single underscores\n * ~strikethrough~ that should stay as single tildes\n */\n\nconst config = {\n  formatting: {\n    bold: '*use asterisks*',\n    italic: '_use underscores_',\n    strike: '~use tildes~',\n    code: '`use backticks`'\n  },\n  examples: [\n    '*not bold*',\n    '_not italic_',\n    '~not strikethrough~'\n  ]\n};\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
 	it("should handle a code block with HTML entities and formatting characters", () => {
-		const input = "```\n// Complex expression with HTML entities and formatting chars\nif (x &lt; 10 &amp;&amp; y &gt; 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x &lt; 10 ? '*low*' : '_high_'}`;\n```";
-		const expected = "```\n// Complex expression with HTML entities and formatting chars\nif (x < 10 && y > 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x < 10 ? '*low*' : '_high_'}`;\n```";
+		const input =
+			"```\n// Complex expression with HTML entities and formatting chars\nif (x &lt; 10 &amp;&amp; y &gt; 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x &lt; 10 ? '*low*' : '_high_'}`;\n```";
+		const expected =
+			"```\n// Complex expression with HTML entities and formatting chars\nif (x < 10 && y > 20 *importance*) {\n  return _value_ ~obsolete~;\n}\n\n// Using backticks inside code block\nconst template = `Value is ${x < 10 ? '*low*' : '_high_'}`;\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
-	
+
 	// Test cases for adding newlines around code blocks when they're missing
 	it("should add a newline after opening code block if missing", () => {
 		const input = "```const x = 10;```";
 		const expected = "```\nconst x = 10;\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
-	
+
 	it("should add a newline before closing code block if missing", () => {
 		const input = "```\nconst x = 10;```";
 		const expected = "```\nconst x = 10;\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
-	
+
 	it("should add newlines on both sides of code block if missing", () => {
 		const input = "```const x = 10;```";
 		const expected = "```\nconst x = 10;\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
-	
+
 	it("should not add extra newlines if they are already present", () => {
 		const input = "```\nconst x = 10;\n```";
 		const expected = "```\nconst x = 10;\n```";
@@ -408,8 +432,10 @@ describe("slackMarkdownToMarkdown", () => {
 	});
 
 	it("should convert multiple links in text", () => {
-		const input = "Check out <https://example.com> and also <https://another.com|Another Site>";
-		const expected = "Check out [https://example.com](https://example.com) and also [Another Site](https://another.com)";
+		const input =
+			"Check out <https://example.com> and also <https://another.com|Another Site>";
+		const expected =
+			"Check out [https://example.com](https://example.com) and also [Another Site](https://another.com)";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
@@ -421,13 +447,15 @@ describe("slackMarkdownToMarkdown", () => {
 
 	it("should convert links inside code blocks", () => {
 		const input = "```\nVisit <https://example.com> for documentation\n```";
-		const expected = "```\nVisit [https://example.com](https://example.com) for documentation\n```";
+		const expected =
+			"```\nVisit [https://example.com](https://example.com) for documentation\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
 	it("should handle links with complex URLs", () => {
 		const input = "<https://example.com/path?param=value&other=123>";
-		const expected = "[https://example.com/path?param=value&other=123](https://example.com/path?param=value&other=123)";
+		const expected =
+			"[https://example.com/path?param=value&other=123](https://example.com/path?param=value&other=123)";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
@@ -490,27 +518,33 @@ describe("slackMarkdownToMarkdown", () => {
 		});
 
 		it("should handle mixed formatting in blockquotes", () => {
-			const input = "> This has *bold* and _italic_ and ~strikethrough~ text\nNext line";
-			const expected = "> This has **bold** and _italic_ and ~~strikethrough~~ text\n\nNext line";
+			const input =
+				"> This has *bold* and _italic_ and ~strikethrough~ text\nNext line";
+			const expected =
+				"> This has **bold** and _italic_ and ~~strikethrough~~ text\n\nNext line";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
 
 		// Other elements within blockquotes
 		it("should handle links within blockquote", () => {
 			const input = "> Check out <https://example.com>\nNext line";
-			const expected = "> Check out [https://example.com](https://example.com)\n\nNext line";
+			const expected =
+				"> Check out [https://example.com](https://example.com)\n\nNext line";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
 
 		it("should handle links with display text in blockquotes", () => {
 			const input = "> Check out <https://example.com|Example Site>\nNext line";
-			const expected = "> Check out [Example Site](https://example.com)\n\nNext line";
+			const expected =
+				"> Check out [Example Site](https://example.com)\n\nNext line";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
 
 		it("should handle HTML entities in blockquotes", () => {
-			const input = "> This is &lt; than that and this is &gt; than this\nNext line";
-			const expected = "> This is < than that and this is > than this\n\nNext line";
+			const input =
+				"> This is &lt; than that and this is &gt; than this\nNext line";
+			const expected =
+				"> This is < than that and this is > than this\n\nNext line";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
 
@@ -541,8 +575,10 @@ describe("slackMarkdownToMarkdown", () => {
 
 		// Complex combinations
 		it("should handle blockquotes with formatted text containing special characters", () => {
-			const input = "> *Bold text with > symbol*\n> _Italic with < symbol_\nNext line";
-			const expected = "> **Bold text with > symbol**\n> _Italic with < symbol_\n\nNext line";
+			const input =
+				"> *Bold text with > symbol*\n> _Italic with < symbol_\nNext line";
+			const expected =
+				"> **Bold text with > symbol**\n> _Italic with < symbol_\n\nNext line";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
 	});
