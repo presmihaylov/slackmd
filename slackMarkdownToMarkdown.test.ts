@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LogLevel, slackMarkdownToMarkdown } from "./index";
+import { slackMarkdownToMarkdown } from "./index";
 
 describe("slackMarkdownToMarkdown", () => {
 	describe("Real-world scenarios", () => {
