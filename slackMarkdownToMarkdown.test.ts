@@ -24,7 +24,7 @@ describe("slackMarkdownToMarkdown", () => {
 			const input =
 				"testing:\n1. with ordered\n2. bullet\n    a. here\n    b. and here\n        i. and now\n        ii. and this\nok now what if i continue?\n```code blooock!!!```";
 			const expected =
-				"testing:\n1. with ordered\n2. bullet\n    a. here\n    b. and here\n        i. and now\n        ii. and this\n\nok now what if i continue?\n```\ncode blooock!!!\n```";
+				"testing:\n1. with ordered\n2. bullet\n    * here\n    * and here\n        * and now\n        * and this\n\nok now what if i continue?\n```\ncode blooock!!!\n```";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
 	});

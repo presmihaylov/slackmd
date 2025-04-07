@@ -328,6 +328,43 @@ const isHtmlEntity = (input: StateMachineInput, entity: string): boolean => {
 	return true;
 };
 
+// Helper to check if the current position looks like a roman numeral or alphabetic list marker
+const isAlphaOrRomanListMarker = (input: StateMachineInput): boolean => {
+	const isNestedListMarkerStart = (input: StateMachineInput): boolean => {
+		// We could be at the beginning of a line or after whitespace
+		return (
+			isBeginningOfLine(input) ||
+			(input.previousTokens.length > 0 &&
+				/\s/.test(input.previousTokens[input.previousTokens.length - 1] ?? ""))
+		);
+	};
+
+	if (!isNestedListMarkerStart(input)) return false;
+
+	// Check if current token is a letter (potential start of a list marker)
+	if (!/[a-zA-Z]/.test(input.currentToken)) return false;
+
+	// Look for a period after one or more letters
+	let i = 0;
+	let letterCount = 1; // Start with the current token
+
+	// Count how many consecutive letters we have
+	while (
+		i < input.nextTokens.length &&
+		/[a-zA-Z]/.test(input.nextTokens[i] ?? "")
+	) {
+		letterCount++;
+		i++;
+	}
+
+	// After letters, we need a period followed by a space to confirm it's a list marker
+	return (
+		i < input.nextTokens.length - 1 &&
+		input.nextTokens[i] === "." &&
+		input.nextTokens[i + 1] === " "
+	);
+};
+
 // Helper function to handle special characters (HTML entities)
 const handleSpecialCharacters = (
 	sm: StateMachine,
@@ -426,6 +463,37 @@ const handleSpecialCharacters = (
 			result: sm.result,
 			currentState: {
 				state: nextState,
+				prevState,
+			},
+		};
+	} else if (isAlphaOrRomanListMarker(input)) {
+		// Count how many characters (including current one) until the period
+		let tokensToSkip = 0;
+		while (
+			tokensToSkip < input.nextTokens.length &&
+			input.nextTokens[tokensToSkip] !== "."
+		) {
+			tokensToSkip++;
+		}
+
+		// Add 2 to skip the period
+		tokensToSkip += 1;
+
+		const marker = [input.currentToken]
+			.concat(input.nextTokens.slice(0, tokensToSkip - 1))
+			.join("");
+
+		sm.log.debug(
+			`Converting nested list marker "${marker}" to bullet at position ${input.previousTokens.length}`,
+		);
+
+		return {
+			...sm,
+			result: sm.result + "*",
+			currentState: {
+				state: "SKIP_TOKENS",
+				tokensToSkip: tokensToSkip,
+				nextState: nextState === "TEXT" ? "BULLET_LIST" : nextState,
 				prevState,
 			},
 		};
