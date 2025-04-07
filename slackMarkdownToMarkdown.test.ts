@@ -35,6 +35,14 @@ describe("slackMarkdownToMarkdown", () => {
 				"okok:\n* hello\n    * there\n        * yo\n        * two\n        * thre\n\nok what now?\n1. one\n2. thwo\n3. hre\n    * yooo\n    * hii\n        * baa\n        * baaa\n        * wtfff\n        * kkkk\n        * okook\n\n>  ok blockquoooote\n\nand a code blocK:\n```\nhereeeeeeee!!!\n```\nwhat about `inline code`???? and [this link](https://example.com)?\n\nand **some** formatted _text_ wohooo (~~not this~~).\n>  and inside **this** _thing_ ~~here~~\n> qweqwe `wooo`\n\nok fin";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
+
+		it("should handle links inside code blocks", () => {
+			const input =
+				"yoo\n```heyyyy <https://example.com/> this link and this\n<https://example.com/>\nand that```\nfinally just directy link\n<https://example.com/>";
+			const expected =
+				"yoo\n```\nheyyyy https://example.com/ this link and this\nhttps://example.com/\nand that\n```\nfinally just directy link\n[https://example.com/](https://example.com/)";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
 	});
 
 	it("should return plain text as-is", () => {
