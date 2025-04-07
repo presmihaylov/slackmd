@@ -8,10 +8,11 @@ export type StateKey =
 	| "BLOCKQUOTE"
 	| "BULLET_LIST"
 	| "LINK"
+	| "STRIP_LINK"
 	| "SKIP_TOKENS"
 	| "END";
 
-export type BasicStateKey = Exclude<StateKey, "SKIP_TOKENS" | "LINK">;
+export type BasicStateKey = Exclude<StateKey, "SKIP_TOKENS" | "LINK" | "STRIP_LINK">;
 
 export type BasicStateData = {
 	state: BasicStateKey;
@@ -26,6 +27,14 @@ export type LinkStateData = {
 	prevState: BasicStateKey;
 };
 
+export type StripLinkStateData = {
+	state: "STRIP_LINK";
+	url: string;
+	displayText: string | null;
+	parsingPhase: "url" | "displayText" | "closing";
+	prevState: BasicStateKey;
+};
+
 export type SkipTokensStateData = {
 	state: "SKIP_TOKENS";
 	tokensToSkip: number;
@@ -33,7 +42,7 @@ export type SkipTokensStateData = {
 	prevState: BasicStateKey;
 };
 
-export type StateData = BasicStateData | LinkStateData | SkipTokensStateData;
+export type StateData = BasicStateData | LinkStateData | StripLinkStateData | SkipTokensStateData;
 
 export type StateMachineInput = {
 	previousTokens: string[];
@@ -278,6 +287,26 @@ const createFormattedTextStateHandler = (
 			sm.log.debug(
 				`Detected link inside ${stateKey.toLowerCase()} text at position ${input.previousTokens.length}`,
 			);
+			
+			// For links inside code blocks and inline code, use STRIP_LINK state
+			if (stateKey === "INLINE_CODE" || stateKey === "CODE_BLOCK") {
+				sm.log.debug(
+					`Using STRIP_LINK state for link in ${stateKey.toLowerCase()} at position ${input.previousTokens.length}`,
+				);
+				return {
+					...sm,
+					// Don't add the opening < to the result
+					currentState: {
+						state: "STRIP_LINK",
+						url: "",
+						displayText: null,
+						parsingPhase: "url",
+						prevState: stateKey,
+					},
+				};
+			}
+			
+			// Regular link handling for other formatted text
 			return {
 				...sm,
 				// Don't add the opening < to the result
@@ -504,6 +533,75 @@ const handleSpecialCharacters = (
 };
 
 const states: Record<string, StateHandler> = {
+	STRIP_LINK: (sm: StateMachine, input: StateMachineInput): StateMachine => {
+		if (sm.currentState.state !== "STRIP_LINK") {
+			sm.log.error(`Expected STRIP_LINK state but got ${sm.currentState.state}`);
+			throw new Error("Invalid state");
+		}
+
+		const linkData = sm.currentState as StripLinkStateData;
+
+		// Handle link closing
+		if (input.currentToken === ">") {
+			const url = linkData.url;
+			// In STRIP_LINK, we just want the URL directly
+			sm.log.debug(
+				`Completed STRIP_LINK at token position ${input.previousTokens.length}: ${url}`,
+			);
+
+			return {
+				...sm,
+				result: sm.result + url,
+				currentState: {
+					state: input.nextTokens.length > 0 ? linkData.prevState : "END",
+					prevState: linkData.prevState,
+				},
+			};
+		}
+
+		// Handle separator between URL and display text
+		if (input.currentToken === "|" && linkData.parsingPhase === "url") {
+			sm.log.debug(
+				`Link separator found in STRIP_LINK at token position ${input.previousTokens.length}, switching to display text (ignored)`,
+			);
+			return {
+				...sm,
+				currentState: {
+					...linkData,
+					displayText: "",
+					parsingPhase: "displayText",
+				},
+			};
+		}
+
+		// Accumulate URL characters
+		if (linkData.parsingPhase === "url") {
+			return {
+				...sm,
+				currentState: {
+					...linkData,
+					url: linkData.url + input.currentToken,
+				},
+			};
+		}
+
+		// Accumulate display text characters (ignored for output)
+		if (linkData.parsingPhase === "displayText") {
+			return {
+				...sm,
+				currentState: {
+					...linkData,
+					displayText: (linkData.displayText || "") + input.currentToken,
+				},
+			};
+		}
+
+		// Fallback - should not reach here
+		sm.log.warn(
+			`Unexpected state in STRIP_LINK handler at token position ${input.previousTokens.length}`,
+		);
+		return sm;
+	},
 	BULLET_LIST: (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		// Check for bullet character within list items
 		if (
@@ -843,7 +941,7 @@ const states: Record<string, StateHandler> = {
 				...sm,
 				// Don't add the opening < to the result
 				currentState: {
-					state: "LINK",
+					state: "STRIP_LINK",
 					url: "",
 					displayText: null,
 					parsingPhase: "url",

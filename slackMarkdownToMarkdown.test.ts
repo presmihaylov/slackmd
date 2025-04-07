@@ -471,13 +471,6 @@ describe("slackMarkdownToMarkdown", () => {
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
-	it("should convert links inside code blocks", () => {
-		const input = "```\nVisit <https://example.com> for documentation\n```";
-		const expected =
-			"```\nVisit [https://example.com](https://example.com) for documentation\n```";
-		expect(slackMarkdownToMarkdown(input)).toBe(expected);
-	});
-
 	it("should handle links with complex URLs", () => {
 		const input = "<https://example.com/path?param=value&other=123>";
 		const expected =
@@ -488,6 +481,26 @@ describe("slackMarkdownToMarkdown", () => {
 	it("should handle links with complex display text", () => {
 		const input = "<https://example.com|Visit *Example* Site>";
 		const expected = "[Visit *Example* Site](https://example.com)";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should strip links inside inline code", () => {
+		const input = "Check out this `<https://example.com|link>` in code";
+		const expected = "Check out this `https://example.com` in code";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should strip display text from links in code blocks", () => {
+		const input = "```\nSee documentation at <https://example.com|docs>\n```";
+		const expected = "```\nSee documentation at https://example.com\n```";
+		expect(slackMarkdownToMarkdown(input)).toBe(expected);
+	});
+
+	it("should handle multiple links in code blocks", () => {
+		const input =
+			"```\nCheck out <https://example1.com> and <https://example2.com|example2>\n```";
+		const expected =
+			"```\nCheck out https://example1.com and https://example2.com\n```";
 		expect(slackMarkdownToMarkdown(input)).toBe(expected);
 	});
 
