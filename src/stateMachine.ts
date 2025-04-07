@@ -12,7 +12,10 @@ export type StateKey =
 	| "SKIP_TOKENS"
 	| "END";
 
-export type BasicStateKey = Exclude<StateKey, "SKIP_TOKENS" | "LINK" | "STRIP_LINK">;
+export type BasicStateKey = Exclude<
+	StateKey,
+	"SKIP_TOKENS" | "LINK" | "STRIP_LINK"
+>;
 
 export type BasicStateData = {
 	state: BasicStateKey;
@@ -25,6 +28,7 @@ export type LinkStateData = {
 	displayText: string | null;
 	parsingPhase: "url" | "displayText" | "closing";
 	prevState: BasicStateKey;
+	originalState?: BasicStateKey;
 };
 
 export type StripLinkStateData = {
@@ -33,6 +37,7 @@ export type StripLinkStateData = {
 	displayText: string | null;
 	parsingPhase: "url" | "displayText" | "closing";
 	prevState: BasicStateKey;
+	originalState?: BasicStateKey;
 };
 
 export type SkipTokensStateData = {
@@ -42,7 +47,11 @@ export type SkipTokensStateData = {
 	prevState: BasicStateKey;
 };
 
-export type StateData = BasicStateData | LinkStateData | StripLinkStateData | SkipTokensStateData;
+export type StateData =
+	| BasicStateData
+	| LinkStateData
+	| StripLinkStateData
+	| SkipTokensStateData;
 
 export type StateMachineInput = {
 	previousTokens: string[];
@@ -287,7 +296,7 @@ const createFormattedTextStateHandler = (
 			sm.log.debug(
 				`Detected link inside ${stateKey.toLowerCase()} text at position ${input.previousTokens.length}`,
 			);
-			
+
 			// For links inside code blocks and inline code, use STRIP_LINK state
 			if (stateKey === "INLINE_CODE" || stateKey === "CODE_BLOCK") {
 				sm.log.debug(
@@ -302,10 +311,11 @@ const createFormattedTextStateHandler = (
 						displayText: null,
 						parsingPhase: "url",
 						prevState: stateKey,
+						originalState: sm.currentState.prevState,
 					},
 				};
 			}
-			
+
 			// Regular link handling for other formatted text
 			return {
 				...sm,
@@ -316,6 +326,7 @@ const createFormattedTextStateHandler = (
 					displayText: null,
 					parsingPhase: "url",
 					prevState: stateKey,
+					originalState: sm.currentState.prevState,
 				},
 			};
 		}
@@ -535,18 +546,20 @@ const handleSpecialCharacters = (
 const states: Record<string, StateHandler> = {
 	STRIP_LINK: (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		if (sm.currentState.state !== "STRIP_LINK") {
-			sm.log.error(`Expected STRIP_LINK state but got ${sm.currentState.state}`);
+			sm.log.error(
+				`Expected STRIP_LINK state but got ${sm.currentState.state}`,
+			);
 			throw new Error("Invalid state");
 		}
 
-		const linkData = sm.currentState as StripLinkStateData;
+		const linkData = sm.currentState;
 
 		// Handle link closing
 		if (input.currentToken === ">") {
 			const url = linkData.url;
 			// In STRIP_LINK, we just want the URL directly
 			sm.log.debug(
-				`Completed STRIP_LINK at token position ${input.previousTokens.length}: ${url}`,
+				`Completed STRIP_LINK at token position ${input.previousTokens.length}: ${url}.`,
 			);
 
 			return {
@@ -554,7 +567,7 @@ const states: Record<string, StateHandler> = {
 				result: sm.result + url,
 				currentState: {
 					state: input.nextTokens.length > 0 ? linkData.prevState : "END",
-					prevState: linkData.prevState,
+					prevState: linkData.originalState ?? linkData.prevState,
 				},
 			};
 		}
@@ -995,7 +1008,7 @@ const states: Record<string, StateHandler> = {
 				result: sm.result + markdownLink,
 				currentState: {
 					state: input.nextTokens.length > 0 ? linkData.prevState : "END",
-					prevState: linkData.prevState,
+					prevState: linkData.originalState ?? linkData.prevState,
 				},
 			};
 		}

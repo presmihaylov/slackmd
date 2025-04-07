@@ -43,6 +43,13 @@ describe("slackMarkdownToMarkdown", () => {
 				"yoo\n```\nheyyyy https://example.com/ this link and this\nhttps://example.com/\nand that\n```\nfinally just directy link\n[https://example.com/](https://example.com/)";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
+		it("very complex scenario with everything", () => {
+			const input =
+				"ok now links in `code <https://example.com/> blocks`\nyoo\n```heyyyy <https://example.com/> this link and this\n<https://example.com/>\nand that```\nfinally just directy link\n<https://example.com/>";
+			const expected =
+				"ok now links in `code https://example.com/ blocks`\nyoo\n```\nheyyyy https://example.com/ this link and this\nhttps://example.com/\nand that\n```\nfinally just directy link\n[https://example.com/](https://example.com/)";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
 	});
 
 	it("should return plain text as-is", () => {
