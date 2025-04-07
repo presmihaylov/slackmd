@@ -27,6 +27,14 @@ describe("slackMarkdownToMarkdown", () => {
 				"testing:\n1. with ordered\n2. bullet\n    * here\n    * and here\n        * and now\n        * and this\n\nok now what if i continue?\n```\ncode blooock!!!\n```";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
+
+		it("should handle complicated all-round scenario", () => {
+			const input =
+				"okok:\n\u2022 hello\n    \u25e6 there\n        \u25aa\ufe0e yo\n        \u25aa\ufe0e two\n        \u25aa\ufe0e thre\nok what now?\n1. one\n2. thwo\n3. hre\n    a. yooo\n    b. hii\n        i. baa\n        ii. baaa\n        iii. wtfff\n        iv. kkkk\n        v. okook\n&gt;  ok blockquoooote\nand a code blocK:\n```hereeeeeeee!!!```\nwhat about `inline code`???? and <https://example.com|this link>?\n\nand *some* formatted _text_ wohooo (~not this~).\n&gt;  and inside *this* _thing_ ~here~\n&gt; qweqwe `wooo`\nok fin";
+			const expected =
+				"okok:\n* hello\n    * there\n        * yo\n        * two\n        * thre\n\nok what now?\n1. one\n2. thwo\n3. hre\n    * yooo\n    * hii\n        * baa\n        * baaa\n        * wtfff\n        * kkkk\n        * okook\n\n>  ok blockquoooote\n\nand a code blocK:\n```\nhereeeeeeee!!!\n```\nwhat about `inline code`???? and [this link](https://example.com)?\n\nand **some** formatted _text_ wohooo (~~not this~~).\n>  and inside **this** _thing_ ~~here~~\n> qweqwe `wooo`\n\nok fin";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
 	});
 
 	it("should return plain text as-is", () => {
