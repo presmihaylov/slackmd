@@ -145,11 +145,22 @@ const isInlineCode = (input: StateMachineInput): boolean => {
 
 // Helper function to check for bullet list markers
 const isBulletListMarker = (input: StateMachineInput): boolean => {
-	// Check if we're at the beginning of a line
-	if (!isBeginningOfLine(input)) return false;
+	// Check if we're at the beginning of a line or after indentation
+	const isAtLineStartOrIndented =
+		isBeginningOfLine(input) ||
+		(input.previousTokens.length > 0 &&
+			input.previousTokens[input.previousTokens.length - 1] === " ");
 
-	// Check for bullet character
-	if (input.currentToken === "\u2022") return true;
+	if (!isAtLineStartOrIndented) return false;
+
+	// Check for common bullet characters
+	if (
+		input.currentToken === "\u2022" || // •
+		input.currentToken === "\u25e6" || // ◦
+		input.currentToken === "\u25aa" // ▪
+	) {
+		return true;
+	}
 
 	// Check for asterisk bullet (* )
 	if (
@@ -161,6 +172,57 @@ const isBulletListMarker = (input: StateMachineInput): boolean => {
 	}
 
 	return false;
+};
+
+const isFollowedByBulletListMarker = (input: StateMachineInput): boolean => {
+	const isBulletChar = (char: string): boolean =>
+		char === "\u2022" || // •
+		char === "\u25e6" || // ◦
+		char === "\u25aa" || // ▪
+		char === "*";
+
+	// Check if current token is a bullet character
+	if (isBulletChar(input.currentToken)) {
+		return true;
+	}
+
+	// Check if next token is a bullet character
+	if (input.nextTokens.length > 0 && isBulletChar(input.nextTokens[0] ?? "")) {
+		return true;
+	}
+
+	// Look for bullet character after whitespace in next tokens
+	for (let i = 1; i < input.nextTokens.length; i++) {
+		if (
+			input.nextTokens[i - 1] === " " &&
+			isBulletChar(input.nextTokens[i] ?? "")
+		) {
+			return true;
+		}
+
+		if (input.nextTokens[i] !== " ") {
+			return false;
+		}
+	}
+
+	return false;
+};
+
+const isFollowedByOrderedListMarker = (input: StateMachineInput): boolean => {
+	// Create regex pattern for ordered list markers
+	// Matches:
+	// - Optional whitespace
+	// - One or more digits or letters
+	// - A period
+	// - A space
+	const orderedListPattern = /^\s*(?:\d+|[a-zA-Z]+)\.\s/;
+
+	// Combine current token and next tokens into a single string (limit to 15 chars for efficiency)
+	const combinedText =
+		input.currentToken + input.nextTokens.slice(0, 14).join("");
+
+	// Check if the combined text matches the ordered list pattern
+	return orderedListPattern.test(combinedText);
 };
 
 // Helper function to check for ordered list markers (1., 2., etc.)
@@ -357,6 +419,16 @@ const handleSpecialCharacters = (
 				prevState,
 			},
 		};
+	} else if (input.currentToken === "\ufe0e") {
+		sm.log.debug(`Skipping invisible unicode symbol sent by slack`);
+		return {
+			...sm,
+			result: sm.result,
+			currentState: {
+				state: nextState,
+				prevState,
+			},
+		};
 	}
 
 	// No special character found
@@ -366,7 +438,11 @@ const handleSpecialCharacters = (
 const states: Record<string, StateHandler> = {
 	BULLET_LIST: (sm: StateMachine, input: StateMachineInput): StateMachine => {
 		// Check for bullet character within list items
-		if (input.currentToken === "\u2022") {
+		if (
+			input.currentToken === "\u2022" || // bullet •
+			input.currentToken === "\u25e6" || // white bullet ◦
+			input.currentToken === "\u25aa" // black small square ▪
+		) {
 			sm.log.debug(
 				`Converting bullet point inside list at token position ${input.previousTokens.length}`,
 			);
@@ -385,12 +461,12 @@ const states: Record<string, StateHandler> = {
 			// Look ahead to check if the next line is another list item
 			const isFollowedByListItem =
 				input.nextTokens.length > 0 &&
-				(isBulletListMarker({
+				(isFollowedByBulletListMarker({
 					previousTokens: [...input.previousTokens, input.currentToken],
 					currentToken: input.nextTokens[0] || "",
 					nextTokens: input.nextTokens.slice(1),
 				}) ||
-					isOrderedListMarker({
+					isFollowedByOrderedListMarker({
 						previousTokens: [...input.previousTokens, input.currentToken],
 						currentToken: input.nextTokens[0] || "",
 						nextTokens: input.nextTokens.slice(1),

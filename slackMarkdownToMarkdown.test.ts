@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { slackMarkdownToMarkdown } from "./index";
+import { LogLevel, slackMarkdownToMarkdown } from "./index";
 
 describe("slackMarkdownToMarkdown", () => {
 	describe("Real-world scenarios", () => {
@@ -10,7 +10,25 @@ describe("slackMarkdownToMarkdown", () => {
 				"hello\n* hii\n* foo\n* bartr\n\nlist:\n1. one\n2. two\n3. three\n\n> heyyy a quote\n\na full code block\n```\nyoooo\n```\na partial `code block` here\n\na **bold** text and _italic_ and ~~strikethrough~~\n\nand here is [a link](https://example.com)";
 			expect(slackMarkdownToMarkdown(input)).toBe(expected);
 		});
+
+		// Test for nested bullet points with various Unicode symbols
+		it("should handle nested bullet points with various unicode symbols", () => {
+			const input =
+				"testing:\n\u2022 with\n    \u25e6 nested\n    \u25e6 bullets\n        \u25aa\ufe0e here\n        \u25aa\ufe0e and here\nwhat if I continue?";
+			const expected =
+				"testing:\n* with\n    * nested\n    * bullets\n        * here\n        * and here\n\nwhat if I continue?";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
+
+		it("should handle nested ordered lists", () => {
+			const input =
+				"testing:\n1. with ordered\n2. bullet\n    a. here\n    b. and here\n        i. and now\n        ii. and this\nok now what if i continue?\n```code blooock!!!```";
+			const expected =
+				"testing:\n1. with ordered\n2. bullet\n    a. here\n    b. and here\n        i. and now\n        ii. and this\n\nok now what if i continue?\n```\ncode blooock!!!\n```";
+			expect(slackMarkdownToMarkdown(input)).toBe(expected);
+		});
 	});
+
 	it("should return plain text as-is", () => {
 		const input = "This is a plain text string with no markdown";
 		expect(slackMarkdownToMarkdown(input)).toBe(input);
